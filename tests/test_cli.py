@@ -61,6 +61,15 @@ class CliTests(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertIn("bad.en:1", stderr.getvalue())
 
+    def test_solve_command_generates_sibling_python_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "task.en"
+            source.write_text("# Calculate the sum of all numbers in the list.", encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = main(["solve", str(source)])
+            self.assertEqual(result, 0)
+            self.assertIn("def calculate_sum", source.with_suffix(".py").read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,20 +3,27 @@ import unittest
 
 from codeinenglish.ir import (
     Append,
+    Attribute,
     Assign,
     Binary,
     Compare,
     Contains,
     CreateDictionary,
     CreateList,
+    ClassDef,
+    CreateInstance,
     Display,
     ForEach,
     If,
     Index,
     Literal,
+    MethodCall,
+    MethodDef,
     Name,
     Program,
     ReadInput,
+    Return,
+    SetAttribute,
     SetItem,
 )
 from codeinenglish.python_generator import generate_python
@@ -102,6 +109,18 @@ class GeneratePythonTests(unittest.TestCase):
         except TypeError as error:
             self.fail(f"generator does not support the collection IR: {error}")
         self.assert_python_equal(source, "nums = []\nfor item in nums:\n    pass")
+
+    def test_generates_class_with_method_instance_field_and_return(self):
+        program = Program([
+            ClassDef("Greeter", [MethodDef("greet", ["name"], [Return(Name("name"))])]),
+            CreateInstance("Greeter", "greeter"),
+            SetAttribute(Name("greeter"), "name", Literal("Ada")),
+            Assign("greeting", MethodCall(Name("greeter"), "greet", [Attribute(Name("greeter"), "name")])),
+        ])
+        self.assert_program_equal(
+            program,
+            "class Greeter:\n    def greet(self, name):\n        return name\ngreeter = Greeter()\ngreeter.name = 'Ada'\ngreeting = greeter.greet(greeter.name)",
+        )
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ import ast
 import re
 
 from .errors import CodeInEnglishError
-from .ir import Binary, Compare, Contains, Expr, Index, Literal, Name
+from .ir import Attribute, Binary, Compare, Contains, Expr, Index, Literal, MethodCall, Name
 
 
 _TOKEN = re.compile(
@@ -11,6 +11,7 @@ _TOKEN = re.compile(
     r'|(?P<number>-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?)'
     r'|(?P<word>[A-Za-z_][A-Za-z0-9_]*)'
     r'|(?P<paren>[()])'
+    r'|(?P<dot>\.)'
     r')'
 )
 
@@ -23,9 +24,40 @@ def _tokens(text: str, filename: str, line: int) -> list[str]:
         match = _TOKEN.match(text, position)
         if match is None:
             raise CodeInEnglishError(filename, line, f"unsupported expression near {text[position:]!r}")
-        result.append(match.group("string") or match.group("number") or match.group("word") or match.group("paren"))
+        result.append(match.group("string") or match.group("number") or match.group("word") or match.group("paren") or match.group("dot"))
         position = match.end()
     return result
+
+
+def _split_arguments(text: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    quoted = None
+    escaped = False
+    depth = 0
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if escaped:
+            escaped = False
+        elif quoted and char == "\\":
+            escaped = True
+        elif quoted and char == quoted:
+            quoted = None
+        elif not quoted and char in ('"', "'"):
+            quoted = char
+        elif not quoted and char == "(":
+            depth += 1
+        elif not quoted and char == ")":
+            depth -= 1
+        elif not quoted and depth == 0 and text.startswith(" and ", index):
+            parts.append(text[start:index].strip())
+            index += 4
+            start = index
+            continue
+        index += 1
+    parts.append(text[start:].strip())
+    return parts
 
 
 class _ExpressionParser:
@@ -113,7 +145,15 @@ class _ExpressionParser:
         if lowered == "none":
             return Literal(None)
         if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", token):
-            return Name(token)
+            value: Expr = Name(token)
+            while self.position + 1 < len(self.tokens) and self.tokens[self.position] == ".":
+                self.position += 1
+                attribute = self.tokens[self.position]
+                if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", attribute):
+                    self._error("expected a field or method name after '.'")
+                self.position += 1
+                value = Attribute(value, attribute)
+            return value
         self._error(f"unsupported value {token!r}")
 
     def _error(self, message: str):
@@ -122,5 +162,13 @@ class _ExpressionParser:
 
 def parse_expression(text: str, *, filename: str, line: int) -> Expr:
     """Parse a documented English value or expression into the translator IR."""
+    call = re.fullmatch(r"call\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)(?:\s+with\s+(.+))?", text.strip())
+    if call:
+        receiver, method, raw_arguments = call.groups()
+        arguments = []
+        if raw_arguments:
+            parts = _split_arguments(raw_arguments)
+            arguments = [parse_expression(part, filename=filename, line=line) for part in parts]
+        return MethodCall(Name(receiver), method, arguments)
     tokens = _tokens(text, filename, line)
     return _ExpressionParser(tokens, filename, line).parse()

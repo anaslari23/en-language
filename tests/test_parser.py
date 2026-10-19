@@ -75,6 +75,32 @@ class ParseProgramTests(unittest.TestCase):
         self.assertEqual(type(loop.body[0].condition).__name__, "Contains")
         self.assertEqual(type(loop.body[0].otherwise[0]).__name__, "SetItem")
 
+    def test_parses_class_method_instance_fields_and_call(self):
+        source = (
+            "define a class called Greeter\n"
+            "define a method called greet with parameter name\n"
+            "return name\n"
+            "end method\n"
+            "end class\n"
+            "make a Greeter called greeter\n"
+            'set greeter.name to "Ada"\n'
+            "set greeting to call greeter.greet with greeter.name\n"
+            "show greeting"
+        )
+        program = self.parse(source)
+        self.assertEqual(type(program.statements[0]).__name__, "ClassDef")
+        self.assertEqual(program.statements[0].name, "Greeter")
+        method = program.statements[0].methods[0]
+        self.assertEqual((method.name, method.parameters), ("greet", ["name"]))
+        self.assertEqual(type(program.statements[1]).__name__, "CreateInstance")
+        self.assertEqual(type(program.statements[2]).__name__, "SetAttribute")
+        self.assertEqual(type(program.statements[3].value).__name__, "MethodCall")
+
+    def test_rejects_return_outside_method(self):
+        with self.assertRaises(CodeInEnglishError) as caught:
+            self.parse("return 1")
+        self.assertEqual(caught.exception.kind, "unsupported")
+
     def test_loop_variable_is_local_to_loop_body(self):
         with self.assertRaises(CodeInEnglishError) as caught:
             self.parse("make an empty list called nums\nfor each item in nums\nshow item\nend for\nshow item")
@@ -88,7 +114,7 @@ class ParseProgramTests(unittest.TestCase):
     def test_rejects_unknown_index_names_and_python_escape_syntax(self):
         cases = (
             ("make an empty dictionary called seen\nset seen at missing to 0", "unknown_name"),
-            ("set value to object.attribute", "syntax"),
+            ("set value to object.attribute", "unknown_name"),
             ("import os", "unsupported"),
         )
         for source, kind in cases:

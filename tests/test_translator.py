@@ -21,6 +21,13 @@ class TranslateTests(unittest.TestCase):
         let_form = ast.dump(ast.parse(translate("let answer be 40 plus 2")))
         self.assertEqual(set_form, let_form)
 
+    def test_object_oriented_program_creates_instance_and_calls_method(self):
+        example = Path(__file__).parents[1] / "examples" / "greeter.en"
+        english = example.read_text(encoding="utf-8")
+        displayed = []
+        exec(translate(english), {"print": displayed.append})
+        self.assertEqual(displayed, ["Hello Ada"])
+
 
 class CollectionProgramTests(unittest.TestCase):
     _algorithm = """set answer to none

@@ -5,10 +5,13 @@ from .errors import CodeInEnglishError
 from .expressions import parse_expression
 from .ir import (
     Append,
+    Attribute,
     Assign,
     Binary,
     Compare,
     Contains,
+    ClassDef,
+    CreateInstance,
     CreateDictionary,
     CreateList,
     Display,
@@ -17,8 +20,12 @@ from .ir import (
     If,
     Index,
     Name,
+    MethodCall,
+    MethodDef,
     Program,
     ReadInput,
+    Return,
+    SetAttribute,
     SetItem,
     Statement,
 )
@@ -81,6 +88,14 @@ def _validate_expression(expression: Expr, names: set[str], filename: str, line:
         _validate_expression(expression.item, names, filename, line)
         _validate_expression(expression.collection, names, filename, line)
         return
+    if isinstance(expression, Attribute):
+        _validate_expression(expression.value, names, filename, line)
+        return
+    if isinstance(expression, MethodCall):
+        _validate_expression(expression.value, names, filename, line)
+        for argument in expression.arguments:
+            _validate_expression(argument, names, filename, line)
+        return
     if isinstance(expression, Index):
         _validate_expression(expression.collection, names, filename, line)
         _validate_expression(expression.index, names, filename, line)
@@ -102,6 +117,7 @@ def parse_program(source: str, filename: str = "<string>") -> Program:
     statements: list[Statement] = []
     names: set[str] = set()
     collection_kinds: dict[str, str] = {}
+    classes: set[str] = set()
     loop_scopes: list[set[str]] = []
     blocks: list[dict] = []
 
@@ -124,6 +140,10 @@ def parse_program(source: str, filename: str = "<string>") -> Program:
         frame = blocks[-1]
         if frame["kind"] == "if" and frame["branch"] == "otherwise":
             frame["otherwise"].append(statement)
+        elif frame["kind"] == "class":
+            raise CodeInEnglishError(filename, frame["line"], "classes may contain method definitions only")
+        elif frame["kind"] == "method" and len(blocks) == 2:
+            frame["body"].append(statement)
         else:
             frame["body"].append(statement)
 
@@ -140,9 +160,17 @@ def parse_program(source: str, filename: str = "<string>") -> Program:
         blocks.pop()
         if expected_kind == "if":
             statement = If(frame["condition"], frame["body"], frame["otherwise"])
-        else:
+        elif expected_kind == "for":
             loop_scopes.pop()
             statement = ForEach(frame["name"], frame["collection"], frame["body"])
+        elif expected_kind == "method":
+            if len(blocks) != 1 or blocks[-1]["kind"] != "class":
+                raise CodeInEnglishError(filename, line_number, "method must be directly inside a class")
+            loop_scopes.pop()
+            blocks[-1]["methods"].append(MethodDef(frame["name"], frame["parameters"], frame["body"]))
+            return
+        else:
+            statement = ClassDef(frame["name"], frame["methods"])
         append(statement)
 
     for line_number, original in enumerate(source.splitlines(), start=1):
@@ -164,6 +192,42 @@ def parse_program(source: str, filename: str = "<string>") -> Program:
                 "kind": "if", "condition": condition, "line": line_number,
                 "body": [], "otherwise": None, "branch": "body",
             })
+            continue
+
+        class_match = re.fullmatch(r"define a class called ([A-Za-z_][A-Za-z0-9_]*)", line)
+        if class_match:
+            if blocks:
+                raise CodeInEnglishError(filename, line_number, "class definitions must be top-level")
+            name = class_match.group(1)
+            _check_name(name, filename, line_number)
+            if name in classes or name in visible_names():
+                raise CodeInEnglishError(filename, line_number, f"{name!r} is already defined")
+            classes.add(name)
+            blocks.append({"kind": "class", "name": name, "methods": [], "line": line_number})
+            continue
+
+        method_match = re.fullmatch(
+            r"define a method called ([A-Za-z_][A-Za-z0-9_]*)(?: with parameters? (.+))?", line
+        )
+        if method_match:
+            if not blocks or blocks[-1]["kind"] != "class":
+                raise CodeInEnglishError(filename, line_number, "methods must be defined inside a class")
+            name, raw_parameters = method_match.groups()
+            _check_name(name, filename, line_number)
+            parameters = re.split(r"\s+and\s+", raw_parameters) if raw_parameters else []
+            for parameter in parameters:
+                _check_name(parameter, filename, line_number)
+            if len(parameters) != len(set(parameters)):
+                raise CodeInEnglishError(filename, line_number, "method parameters must be unique")
+            loop_scopes.append({"self", *parameters})
+            blocks.append({"kind": "method", "name": name, "parameters": parameters, "body": [], "line": line_number})
+            continue
+
+        if line == "end method":
+            close_block("method", line_number)
+            continue
+        if line == "end class":
+            close_block("class", line_number)
             continue
 
         if line.startswith("for each "):
@@ -198,6 +262,40 @@ def parse_program(source: str, filename: str = "<string>") -> Program:
             continue
         if line == "end for":
             close_block("for", line_number)
+            continue
+
+        instance_match = re.fullmatch(r"make a ([A-Za-z_][A-Za-z0-9_]*) called ([A-Za-z_][A-Za-z0-9_]*)", line)
+        if instance_match:
+            class_name, name = instance_match.groups()
+            if class_name not in classes:
+                raise CodeInEnglishError(filename, line_number, f"unknown class {class_name!r}", kind="unknown_name")
+            _check_name(name, filename, line_number)
+            define_name(name)
+            append(CreateInstance(class_name, name))
+            continue
+
+        attribute_assignment = re.fullmatch(r"set ([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*) to (.+)", line)
+        if attribute_assignment:
+            receiver, attribute, raw_value = attribute_assignment.groups()
+            if receiver not in visible_names():
+                raise CodeInEnglishError(filename, line_number, f"unknown name {receiver!r}", kind="unknown_name")
+            value = parse_expression(raw_value, filename=filename, line=line_number)
+            _validate_expression(value, visible_names(), filename, line_number)
+            append(SetAttribute(Name(receiver), attribute, value))
+            continue
+
+        if line.startswith("return "):
+            if not any(frame["kind"] == "method" for frame in blocks):
+                raise CodeInEnglishError(filename, line_number, "return is only allowed inside a method", kind="unsupported")
+            value = parse_expression(line[7:], filename=filename, line=line_number)
+            _validate_expression(value, visible_names(), filename, line_number)
+            append(Return(value))
+            continue
+
+        if line.startswith("call "):
+            expression = parse_expression(line, filename=filename, line=line_number)
+            _validate_expression(expression, visible_names(), filename, line_number)
+            append(expression)
             continue
 
         creation = re.fullmatch(r"make an empty (list|dictionary) called ([A-Za-z_][A-Za-z0-9_]*)", line)

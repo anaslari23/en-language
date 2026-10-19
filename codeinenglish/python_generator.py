@@ -3,11 +3,14 @@ import ast
 from .errors import CodeInEnglishError
 from .ir import (
     Append,
+    Attribute,
     Assign,
     Binary,
     Compare,
     Contains,
+    ClassDef as ClassDefinition,
     CreateDictionary,
+    CreateInstance,
     CreateList,
     Display,
     Expr,
@@ -15,9 +18,13 @@ from .ir import (
     If,
     Index,
     Literal,
+    MethodCall,
+    MethodDef,
     Name,
     Program,
     ReadInput,
+    Return,
+    SetAttribute,
     SetItem,
     Statement,
 )
@@ -65,6 +72,14 @@ def _expression(node: Expr) -> ast.expr:
             left=_expression(node.item),
             ops=[ast.In()],
             comparators=[_expression(node.collection)],
+        )
+    if isinstance(node, Attribute):
+        return ast.Attribute(value=_expression(node.value), attr=node.name, ctx=ast.Load())
+    if isinstance(node, MethodCall):
+        return ast.Call(
+            func=ast.Attribute(value=_expression(node.value), attr=node.name, ctx=ast.Load()),
+            args=[_expression(argument) for argument in node.arguments],
+            keywords=[],
         )
     raise TypeError(f"unsupported expression IR node: {type(node).__name__}")
 
@@ -163,6 +178,34 @@ def _statements(nodes: list[Statement]) -> list[ast.stmt]:
                     type_comment=None,
                 )
             )
+        elif isinstance(node, ClassDefinition):
+            methods = []
+            for method in node.methods:
+                methods.append(ast.FunctionDef(
+                    name=method.name,
+                    args=ast.arguments(
+                        posonlyargs=[],
+                        args=[ast.arg(arg="self")] + [ast.arg(arg=parameter) for parameter in method.parameters],
+                        kwonlyargs=[], kw_defaults=[], defaults=[],
+                    ),
+                    body=_statements(method.body) or [ast.Pass()],
+                    decorator_list=[],
+                ))
+            result.append(ast.ClassDef(name=node.name, bases=[], keywords=[], body=methods or [ast.Pass()], decorator_list=[]))
+        elif isinstance(node, CreateInstance):
+            result.append(ast.Assign(
+                targets=[ast.Name(id=node.name, ctx=ast.Store())],
+                value=_call(node.class_name, []),
+            ))
+        elif isinstance(node, SetAttribute):
+            result.append(ast.Assign(
+                targets=[ast.Attribute(value=_expression(node.value), attr=node.name, ctx=ast.Store())],
+                value=_expression(node.expression),
+            ))
+        elif isinstance(node, Return):
+            result.append(ast.Return(value=_expression(node.value)))
+        elif isinstance(node, MethodCall):
+            result.append(ast.Expr(value=_expression(node)))
         else:
             raise TypeError(f"unsupported statement IR node: {type(node).__name__}")
     return result
@@ -171,7 +214,15 @@ def _statements(nodes: list[Statement]) -> list[ast.stmt]:
 def generate_python(program: Program) -> str:
     """Generate and syntax-check Python source from a program IR."""
     module = ast.fix_missing_locations(ast.Module(body=_statements(program.statements), type_ignores=[]))
+    return generate_python_ast(module)
+
+
+def generate_python_ast(module: ast.Module, comments: list[str] | None = None) -> str:
+    """Render and syntax-check a Python AST module."""
+    module = ast.fix_missing_locations(module)
     source = ast.unparse(module)
+    if comments:
+        source = "\n".join(f"# {line}" if line else "#" for line in comments) + "\n\n" + source
     try:
         ast.parse(source)
     except SyntaxError as error:

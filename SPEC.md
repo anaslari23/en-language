@@ -14,6 +14,16 @@ Let a user describe a program in supported, ordinary English in a `.en` file and
 - The source `.en` file is not modified. Failed or invalid translation must not replace an existing `.py` output.
 - No model, network access, package dependency, or model download is required. Use the Python standard library at runtime.
 
+## Comment-based problem generation
+
+The package also accepts a `.en` problem file containing blank lines, the optional exact directive `import codeinpython library`, and `#` comments describing the task. `solve(source)` returns Python source and `solve_file(path, output_path=None)` writes a sibling `.py` by default. The CLI form is `python3 -m codeinenglish solve SOURCE [--output PATH]`. The directive is not included in generated Python. This path is a curated deterministic recognizer and strategy library, not an unrestricted English translator.
+
+Generated solutions include the callable algorithm function and a main() wrapper. The wrapper reads one JSON object from standard input whose keys are the canonical function argument names, validates key/type requirements, and writes one JSON result to standard output. The generated file may be run separately by the user; translation never executes it. If comment pairs Example input: <JSON object> and Example output: <JSON value> are included, they are embedded in the generated source and can be checked by running that source with --check-examples.
+
+Every generated file includes an interpreted function signature and lists material assumptions as stated or defaulted. The solution contract documents edge behavior, including first-pair selection and null when no pair exists, first matching search index and -1 when absent, case-sensitive text comparison by default, and empty-input behavior. Conflicting or unsupported behavior requests fail with a source-located diagnostic.
+
+Supported problem families now include pair-sum indices; duplicate detection; per-value frequencies; palindrome; anagram; sorted binary search; minimum, maximum, and sum; first unique character; reverse text; move zeros to the end; merge sorted lists; maximum contiguous subarray sum; and balanced delimiters. This growing fixed catalog does not guarantee understanding of arbitrary English. Prompt examples, strategy reference tests, and syntax validation provide evidence but cannot prove that every novel wording was understood as intended.
+
 ## What “understand English” means here
 
 The translator uses deterministic parsing rules, vocabulary, and grammar. It should accept multiple documented English phrasings for the same programming intent, including common synonyms and harmless variations in word order. It will translate only requests it can map to a supported program structure. It must explain unsupported or ambiguous requests rather than silently inventing behavior.
@@ -37,7 +47,7 @@ Build coverage in independently usable stages:
 1. **Core statements:** assignment; string, number, Boolean, and `None` values; arithmetic and comparisons; output; input; comments; clear errors.
 2. **Control flow:** `if`/`else`, `while`, and `for each` over a collection, including nested blocks.
 3. **Collections:** list and dictionary creation, indexing, append/update, membership, length, and iteration.
-4. **Functions:** function definitions, parameters, calls, and return values.
+4. **Object-oriented programming:** classes, instances, fields, methods, parameters, calls, and return values. Inheritance and custom constructors remain future work.
 5. **Common algorithms:** recognize general task descriptions and map their stated steps to the core constructs above; add named task patterns only when they represent reusable intent rather than one hard-coded exercise.
 
 Each stage must document accepted phrasing, generated Python behavior, and unsupported cases. Do not claim a later stage is supported until it has examples and verification.

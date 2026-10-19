@@ -22,6 +22,11 @@ def translate_file(source_path: str | Path, output_path: str | Path | None = Non
     english_source = source.read_text(encoding="utf-8")
     python_source = translate(english_source, str(source))
 
+    _write_python(python_source, destination)
+    return destination
+
+
+def _write_python(python_source: str, destination: Path) -> None:
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -41,4 +46,3 @@ def translate_file(source_path: str | Path, output_path: str | Path | None = Non
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
-    return destination

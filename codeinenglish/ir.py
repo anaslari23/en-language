@@ -38,7 +38,20 @@ class Contains:
     collection: "Expr"
 
 
-Expr: TypeAlias = Literal | Name | Binary | Compare | Index | Contains
+@dataclass(frozen=True)
+class Attribute:
+    value: "Expr"
+    name: str
+
+
+@dataclass(frozen=True)
+class MethodCall:
+    value: "Expr"
+    name: str
+    arguments: list["Expr"]
+
+
+Expr: TypeAlias = Literal | Name | Binary | Compare | Index | Contains | Attribute | MethodCall
 
 
 @dataclass(frozen=True)
@@ -95,7 +108,38 @@ class ForEach:
     body: list["Statement"]
 
 
-Statement: TypeAlias = Assign | ReadInput | Display | If | CreateList | CreateDictionary | Append | SetItem | ForEach
+@dataclass(frozen=True)
+class MethodDef:
+    name: str
+    parameters: list[str]
+    body: list["Statement"]
+
+
+@dataclass(frozen=True)
+class ClassDef:
+    name: str
+    methods: list[MethodDef]
+
+
+@dataclass(frozen=True)
+class CreateInstance:
+    class_name: str
+    name: str
+
+
+@dataclass(frozen=True)
+class SetAttribute:
+    value: Expr
+    name: str
+    expression: Expr
+
+
+@dataclass(frozen=True)
+class Return:
+    value: Expr
+
+
+Statement: TypeAlias = Assign | ReadInput | Display | If | CreateList | CreateDictionary | Append | SetItem | ForEach | ClassDef | MethodDef | CreateInstance | SetAttribute | Return | MethodCall
 
 
 @dataclass(frozen=True)
