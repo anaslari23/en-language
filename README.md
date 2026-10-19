@@ -46,7 +46,7 @@ Running `python3 -m codeinenglish` or `./bin/codeinenglish` from this folder nee
 
 ## Supported English forms
 
-Each instruction is on its own line. Blank lines and lines beginning with `#` are ignored. Blocks use `otherwise` and `end if` markers; indentation is not used. Variable names use Python identifier spelling. `input`, `print`, and `str` are reserved names.
+Each instruction is on its own line. Blank lines and lines beginning with `#` are ignored. `if` blocks use `otherwise` and `end if`; `for each` loops end with `end for`. Indentation is not used. Variable names use Python identifier spelling. `input`, `print`, and `str` are reserved names.
 
 - Assign a value: `set age to 20` or `let age be 20`
 - Ask for input: `ask for your name and call it name`
@@ -56,6 +56,12 @@ Each instruction is on its own line. Blank lines and lines beginning with `#` ar
 - Arithmetic: `plus`, `minus`, `times`, and `divided by`; parentheses may group expressions
 - Comparisons: `is`, `is not`, `greater than`, and `less than`
 - Conditional: `if age is 20 then`, followed by instructions, optional `otherwise` instructions, and `end if`
+- Create collections: `make an empty list called nums` or `make an empty dictionary called seen`
+- Add to a list: `add number to nums`
+- Read or update an item: `seen at key`; `set seen at key to value`
+- Check membership: `if key is in seen then`
+- Loop over a list: `for each number in nums`, followed by instructions and `end for`
+- Nest `if` and `for each` blocks using matching `end if` and `end for` markers
 
 Example:
 
@@ -68,7 +74,17 @@ show "Hello there"
 end if
 ```
 
-This first milestone supports one non-nested conditional block. It does not yet support loops, lists, dictionaries, functions, or arbitrary free-form English. Use the documented forms; unsupported or ambiguous instructions return a diagnostic with the filename and line instead of guessing.
+Nested `if` and `for each` blocks use matching end markers. Functions, return values, and arbitrary free-form English are not supported yet. Use the documented forms; unsupported or ambiguous instructions return a diagnostic with the filename and line instead of guessing.
+
+## Collections and loops
+
+Lists and dictionaries can be created and filled without comma-separated literals. A `for each` loop and nested decisions let you express small algorithms with the same general-purpose features. For example, this Two Sum program is ordinary `.en` source, not a built-in Two Sum shortcut:
+
+```sh
+python3 -m codeinenglish translate examples/two_sum.en
+```
+
+The example writes Python that displays `[0, 1]`. The grammar currently supports empty list/dictionary creation, list append, item reads and updates, dictionary membership, and list iteration. Functions, return values, and arbitrary free-form English are not supported yet. Unsupported wording produces a diagnostic instead of guessed code.
 
 ## Safety and output behavior
 

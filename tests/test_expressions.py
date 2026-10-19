@@ -39,6 +39,20 @@ class ParseExpressionTests(unittest.TestCase):
         self.assertEqual(self.parse("age greater than 18"), Compare(Name("age"), ">", Literal(18)))
         self.assertEqual(self.parse("age less than 18"), Compare(Name("age"), "<", Literal(18)))
 
+    def test_parses_collection_indexing(self):
+        for source, collection, index in (("nums at index", "nums", "index"), ("seen at complement", "seen", "complement")):
+            with self.subTest(source=source):
+                expression = self.parse(source)
+                self.assertEqual(type(expression).__name__, "Index")
+                self.assertEqual(expression.collection, Name(collection))
+                self.assertEqual(expression.index, Name(index))
+
+    def test_parses_membership_condition(self):
+        expression = self.parse("target minus number is in seen")
+        self.assertEqual(type(expression).__name__, "Contains")
+        self.assertEqual(expression.item, Binary(Name("target"), "-", Name("number")))
+        self.assertEqual(expression.collection, Name("seen"))
+
     def test_malformed_expression_has_source_location(self):
         with self.assertRaises(CodeInEnglishError) as caught:
             self.parse("2 plus")

@@ -3,7 +3,25 @@ import re
 
 from .errors import CodeInEnglishError
 from .expressions import parse_expression
-from .ir import Assign, Compare, Display, Expr, If, Name, Program, ReadInput, Statement
+from .ir import (
+    Append,
+    Assign,
+    Binary,
+    Compare,
+    Contains,
+    CreateDictionary,
+    CreateList,
+    Display,
+    Expr,
+    ForEach,
+    If,
+    Index,
+    Name,
+    Program,
+    ReadInput,
+    SetItem,
+    Statement,
+)
 
 
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
@@ -25,7 +43,7 @@ def _split_display(text: str) -> list[str]:
             escaped = True
         elif quoted and char == quoted:
             quoted = None
-        elif not quoted and char in ("\"", "'"):
+        elif not quoted and char in ('"', "'"):
             quoted = char
         elif not quoted and char == "(":
             depth += 1
@@ -59,7 +77,15 @@ def _validate_expression(expression: Expr, names: set[str], filename: str, line:
             )
         _validate_expression(expression.right, names, filename, line)
         return
-    if hasattr(expression, "left"):
+    if isinstance(expression, Contains):
+        _validate_expression(expression.item, names, filename, line)
+        _validate_expression(expression.collection, names, filename, line)
+        return
+    if isinstance(expression, Index):
+        _validate_expression(expression.collection, names, filename, line)
+        _validate_expression(expression.index, names, filename, line)
+        return
+    if isinstance(expression, Binary):
         _validate_expression(expression.left, names, filename, line)
         _validate_expression(expression.right, names, filename, line)
 
@@ -75,58 +101,147 @@ def parse_program(source: str, filename: str = "<string>") -> Program:
     """Parse supported English statements into a source-located program IR."""
     statements: list[Statement] = []
     names: set[str] = set()
-    block: dict | None = None
+    collection_kinds: dict[str, str] = {}
+    loop_scopes: list[set[str]] = []
+    blocks: list[dict] = []
+
+    def visible_names() -> set[str]:
+        result = set(names)
+        for scope in loop_scopes:
+            result.update(scope)
+        return result
+
+    def define_name(name: str) -> None:
+        if loop_scopes:
+            loop_scopes[-1].add(name)
+        else:
+            names.add(name)
 
     def append(statement: Statement) -> None:
-        if block is None:
+        if not blocks:
             statements.append(statement)
+            return
+        frame = blocks[-1]
+        if frame["kind"] == "if" and frame["branch"] == "otherwise":
+            frame["otherwise"].append(statement)
         else:
-            branch = "otherwise" if block["in_otherwise"] else "body"
-            block[branch].append(statement)
+            frame["body"].append(statement)
+
+    def close_block(expected_kind: str, line_number: int) -> None:
+        if not blocks:
+            raise CodeInEnglishError(filename, line_number, f"end {expected_kind} without a matching block")
+        frame = blocks[-1]
+        if frame["kind"] != expected_kind:
+            raise CodeInEnglishError(
+                filename,
+                line_number,
+                f"end {expected_kind} cannot close the open {frame['kind']} block",
+            )
+        blocks.pop()
+        if expected_kind == "if":
+            statement = If(frame["condition"], frame["body"], frame["otherwise"])
+        else:
+            loop_scopes.pop()
+            statement = ForEach(frame["name"], frame["collection"], frame["body"])
+        append(statement)
 
     for line_number, original in enumerate(source.splitlines(), start=1):
         line = original.strip()
         if not line or line.startswith("#"):
             continue
         if original != original.lstrip():
-            raise CodeInEnglishError(filename, line_number, "unexpected indentation; use 'end if' to close a decision")
+            raise CodeInEnglishError(filename, line_number, "unexpected indentation; use matching end markers to close blocks")
 
         if line.startswith("if "):
-            if block is not None:
-                raise CodeInEnglishError(filename, line_number, "nested if blocks are not supported", kind="unsupported")
             match = re.fullmatch(r"if\s+(.+)\s+then", line)
             if not match:
                 raise CodeInEnglishError(filename, line_number, "use: if condition then")
             condition = parse_expression(match.group(1), filename=filename, line=line_number)
-            if not isinstance(condition, Compare):
-                raise CodeInEnglishError(filename, line_number, "an if condition must compare two values")
-            _validate_expression(condition, names, filename, line_number)
-            block = {"condition": condition, "line": line_number, "body": [], "otherwise": None, "in_otherwise": False}
+            if not isinstance(condition, (Compare, Contains)):
+                raise CodeInEnglishError(filename, line_number, "an if condition must compare values or check membership")
+            _validate_expression(condition, visible_names(), filename, line_number)
+            blocks.append({
+                "kind": "if", "condition": condition, "line": line_number,
+                "body": [], "otherwise": None, "branch": "body",
+            })
+            continue
+
+        if line.startswith("for each "):
+            match = re.fullmatch(r"for each\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([A-Za-z_][A-Za-z0-9_]*)", line)
+            if not match:
+                raise CodeInEnglishError(filename, line_number, "use: for each ITEM in LIST")
+            loop_name, collection_name = match.groups()
+            _check_name(loop_name, filename, line_number)
+            if collection_name not in visible_names():
+                raise CodeInEnglishError(filename, line_number, f"unknown collection {collection_name!r}", kind="unknown_name")
+            if collection_kinds.get(collection_name) != "list":
+                raise CodeInEnglishError(filename, line_number, f"{collection_name!r} is not a list created with 'make an empty list'")
+            loop_scopes.append({loop_name})
+            blocks.append({
+                "kind": "for", "name": loop_name, "collection": Name(collection_name),
+                "line": line_number, "body": [],
+            })
             continue
 
         if line == "otherwise":
-            if block is None:
-                raise CodeInEnglishError(filename, line_number, "otherwise without a matching if")
-            if block["in_otherwise"]:
+            if not blocks or blocks[-1]["kind"] != "if":
+                raise CodeInEnglishError(filename, line_number, "otherwise must appear inside an if block")
+            frame = blocks[-1]
+            if frame["otherwise"] is not None:
                 raise CodeInEnglishError(filename, line_number, "only one otherwise is allowed")
-            block["in_otherwise"] = True
-            block["otherwise"] = []
+            frame["otherwise"] = []
+            frame["branch"] = "otherwise"
             continue
 
         if line == "end if":
-            if block is None:
-                raise CodeInEnglishError(filename, line_number, "end if without a matching if")
-            statements.append(If(block["condition"], block["body"], block["otherwise"]))
-            block = None
+            close_block("if", line_number)
+            continue
+        if line == "end for":
+            close_block("for", line_number)
+            continue
+
+        creation = re.fullmatch(r"make an empty (list|dictionary) called ([A-Za-z_][A-Za-z0-9_]*)", line)
+        if creation:
+            kind, name = creation.groups()
+            _check_name(name, filename, line_number)
+            define_name(name)
+            collection_kinds[name] = kind
+            append(CreateList(name) if kind == "list" else CreateDictionary(name))
+            continue
+
+        item_assignment = re.fullmatch(r"set ([A-Za-z_][A-Za-z0-9_]*) at (.+) to (.+)", line)
+        if item_assignment:
+            collection, raw_index, raw_value = item_assignment.groups()
+            if collection not in visible_names():
+                raise CodeInEnglishError(filename, line_number, f"unknown collection {collection!r}", kind="unknown_name")
+            index = parse_expression(raw_index, filename=filename, line=line_number)
+            value = parse_expression(raw_value, filename=filename, line=line_number)
+            current_names = visible_names()
+            _validate_expression(index, current_names, filename, line_number)
+            _validate_expression(value, current_names, filename, line_number)
+            append(SetItem(collection, index, value))
+            continue
+
+        addition = re.fullmatch(r"add (.+) to ([A-Za-z_][A-Za-z0-9_]*)", line)
+        if addition:
+            raw_value, collection = addition.groups()
+            if collection not in visible_names():
+                raise CodeInEnglishError(filename, line_number, f"unknown collection {collection!r}", kind="unknown_name")
+            if collection_kinds.get(collection) != "list":
+                raise CodeInEnglishError(filename, line_number, f"{collection!r} is not a list created with 'make an empty list'")
+            value = parse_expression(raw_value, filename=filename, line=line_number)
+            _validate_expression(value, visible_names(), filename, line_number)
+            append(Append(collection, value))
             continue
 
         assignment = re.fullmatch(r"(?:set\s+([A-Za-z_][A-Za-z0-9_]*)\s+to|let\s+([A-Za-z_][A-Za-z0-9_]*)\s+be)\s+(.+)", line)
         if assignment:
             name = assignment.group(1) or assignment.group(2)
             expression = parse_expression(assignment.group(3), filename=filename, line=line_number)
-            _validate_expression(expression, names, filename, line_number)
+            _validate_expression(expression, visible_names(), filename, line_number)
             _check_name(name, filename, line_number)
-            names.add(name)
+            define_name(name)
+            collection_kinds.pop(name, None)
             append(Assign(name, expression))
             continue
 
@@ -136,7 +251,8 @@ def parse_program(source: str, filename: str = "<string>") -> Program:
             if not re.fullmatch(r"[A-Za-z][A-Za-z ]*", prompt):
                 raise CodeInEnglishError(filename, line_number, "use words after 'ask for your'")
             _check_name(name, filename, line_number)
-            names.add(name)
+            define_name(name)
+            collection_kinds.pop(name, None)
             append(ReadInput(name, prompt.strip()))
             continue
 
@@ -146,14 +262,15 @@ def parse_program(source: str, filename: str = "<string>") -> Program:
                 raise CodeInEnglishError(filename, line_number, "show needs one or more values")
             values = [parse_expression(value, filename=filename, line=line_number) for value in raw_values]
             for value in values:
-                _validate_expression(value, names, filename, line_number)
+                _validate_expression(value, visible_names(), filename, line_number)
             append(Display(values))
             continue
 
-        if line.startswith(("set ", "let ", "ask ", "if ")):
+        if line.startswith(("set ", "let ", "ask ", "if ", "for ", "add ")):
             raise CodeInEnglishError(filename, line_number, f"malformed instruction {line!r}")
         raise CodeInEnglishError(filename, line_number, f"unrecognized instruction {line!r}", kind="unsupported")
 
-    if block is not None:
-        raise CodeInEnglishError(filename, block["line"], "if block needs 'end if'")
+    if blocks:
+        frame = blocks[-1]
+        raise CodeInEnglishError(filename, frame["line"], f"{frame['kind']} block needs 'end {frame['kind']}'")
     return Program(statements)

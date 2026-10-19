@@ -2,7 +2,7 @@ import ast
 import re
 
 from .errors import CodeInEnglishError
-from .ir import Binary, Compare, Expr, Literal, Name
+from .ir import Binary, Compare, Contains, Expr, Index, Literal, Name
 
 
 _TOKEN = re.compile(
@@ -30,6 +30,7 @@ def _tokens(text: str, filename: str, line: int) -> list[str]:
 
 class _ExpressionParser:
     _operators = (
+        (("is", "in"), "in", 1),
         (("is", "not"), "!=", 1),
         (("greater", "than"), ">", 1),
         (("less", "than"), "<", 1),
@@ -60,12 +61,16 @@ class _ExpressionParser:
             operator = self._operator()
             if operator is None:
                 break
-            spelling, symbol, precedence, width = operator
+            symbol, precedence, width = operator
             if precedence < minimum:
                 break
             self.position += width
             right = self._parse_precedence(precedence + 1)
-            if precedence == 1:
+            if symbol == "at":
+                left = Index(left, right)
+            elif symbol == "in":
+                left = Contains(left, right)
+            elif precedence == 1:
                 left = Compare(left, symbol, right)
             else:
                 left = Binary(left, symbol, right)
@@ -73,9 +78,11 @@ class _ExpressionParser:
 
     def _operator(self):
         remaining = tuple(token.lower() for token in self.tokens[self.position :])
+        if remaining[:1] == ("at",):
+            return "at", 30, 1
         for words, symbol, precedence in self._operators:
             if remaining[: len(words)] == words:
-                return words, symbol, precedence, len(words)
+                return symbol, precedence, len(words)
         return None
 
     def _atom(self) -> Expr:

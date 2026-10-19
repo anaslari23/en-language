@@ -39,11 +39,86 @@ class ParseProgramTests(unittest.TestCase):
         program = self.parse("set age to 1\nif age is 1 then\notherwise\nend if")
         self.assertEqual(program.statements[-1], If(Compare(Name("age"), "==", Literal(1)), [], []))
 
-    def test_rejects_nested_conditionals(self):
+    def test_parses_nested_conditionals(self):
+        program = self.parse(
+            "set age to 1\nif age is 1 then\nif age is 1 then\nshow age\nend if\nend if"
+        )
+        outer = program.statements[-1]
+        self.assertEqual(type(outer).__name__, "If")
+        self.assertEqual(type(outer.body[0]).__name__, "If")
+
+    def test_parses_collections_and_nested_blocks(self):
+        source = (
+            "make an empty list called nums\n"
+            "add 7 to nums\n"
+            "make an empty dictionary called seen\n"
+            "for each number in nums\n"
+            "if number is in seen then\n"
+            "show number\n"
+            "otherwise\n"
+            "set seen at number to number\n"
+            "end if\n"
+            "end for"
+        )
+        program = self.parse(source)
+        self.assertEqual(type(program.statements[0]).__name__, "CreateList")
+        self.assertEqual(program.statements[0].name, "nums")
+        self.assertEqual(type(program.statements[1]).__name__, "Append")
+        self.assertEqual(program.statements[1].collection, "nums")
+        self.assertEqual(program.statements[1].value, Literal(7))
+        self.assertEqual(type(program.statements[2]).__name__, "CreateDictionary")
+        loop = program.statements[3]
+        self.assertEqual(type(loop).__name__, "ForEach")
+        self.assertEqual(loop.name, "number")
+        self.assertEqual(loop.collection, Name("nums"))
+        self.assertEqual(type(loop.body[0]).__name__, "If")
+        self.assertEqual(type(loop.body[0].condition).__name__, "Contains")
+        self.assertEqual(type(loop.body[0].otherwise[0]).__name__, "SetItem")
+
+    def test_loop_variable_is_local_to_loop_body(self):
         with self.assertRaises(CodeInEnglishError) as caught:
-            self.parse("set age to 1\nif age is 1 then\nif age is 1 then")
-        self.assertEqual(caught.exception.kind, "unsupported")
-        self.assertEqual(caught.exception.line, 3)
+            self.parse("make an empty list called nums\nfor each item in nums\nshow item\nend for\nshow item")
+        self.assertEqual(caught.exception.kind, "unknown_name")
+        self.assertEqual(caught.exception.line, 5)
+
+    def test_collection_addition_preserves_and_inside_quoted_text(self):
+        program = self.parse('make an empty list called words\nadd "salt and pepper" to words')
+        self.assertEqual(program.statements[1].value, Literal("salt and pepper"))
+
+    def test_rejects_unknown_index_names_and_python_escape_syntax(self):
+        cases = (
+            ("make an empty dictionary called seen\nset seen at missing to 0", "unknown_name"),
+            ("set value to object.attribute", "syntax"),
+            ("import os", "unsupported"),
+        )
+        for source, kind in cases:
+            with self.subTest(source=source), self.assertRaises(CodeInEnglishError) as caught:
+                self.parse(source)
+            self.assertEqual(caught.exception.kind, kind)
+
+    def test_rejects_unknown_collection_values_and_python_calls(self):
+        cases = (
+            ("add 3 to missing", 1),
+            ("make an empty list called nums\nfor each item in missing\nend for", 2),
+            ("set value to __import__(\"os\")", 1),
+        )
+        for source, line in cases:
+            with self.subTest(source=source), self.assertRaises(CodeInEnglishError) as caught:
+                self.parse(source)
+            self.assertEqual(caught.exception.line, line)
+
+    def test_rejects_mismatched_and_unclosed_nested_blocks(self):
+        cases = (
+            ("end for", 1),
+            ("make an empty list called nums\nfor each item in nums\nend if", 3),
+            ("set age to 1\nif age is 1 then\nend for", 3),
+            ("make an empty list called nums\nfor each item in nums", 2),
+            ("set age to 1\nif age is 1 then\nmake an empty list called nums\nfor each item in nums", 4),
+        )
+        for source, line in cases:
+            with self.subTest(source=source), self.assertRaises(CodeInEnglishError) as caught:
+                self.parse(source)
+            self.assertEqual(caught.exception.line, line)
 
     def test_reports_unknown_name(self):
         with self.assertRaises(CodeInEnglishError) as caught:

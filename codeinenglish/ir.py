@@ -26,7 +26,19 @@ class Compare:
     right: "Expr"
 
 
-Expr: TypeAlias = Literal | Name | Binary | Compare
+@dataclass(frozen=True)
+class Index:
+    collection: "Expr"
+    index: "Expr"
+
+
+@dataclass(frozen=True)
+class Contains:
+    item: "Expr"
+    collection: "Expr"
+
+
+Expr: TypeAlias = Literal | Name | Binary | Compare | Index | Contains
 
 
 @dataclass(frozen=True)
@@ -53,7 +65,37 @@ class If:
     otherwise: list["Statement"] | None
 
 
-Statement: TypeAlias = Assign | ReadInput | Display | If
+@dataclass(frozen=True)
+class CreateList:
+    name: str
+
+
+@dataclass(frozen=True)
+class CreateDictionary:
+    name: str
+
+
+@dataclass(frozen=True)
+class Append:
+    collection: str
+    value: Expr
+
+
+@dataclass(frozen=True)
+class SetItem:
+    collection: str
+    index: Expr
+    value: Expr
+
+
+@dataclass(frozen=True)
+class ForEach:
+    name: str
+    collection: Expr
+    body: list["Statement"]
+
+
+Statement: TypeAlias = Assign | ReadInput | Display | If | CreateList | CreateDictionary | Append | SetItem | ForEach
 
 
 @dataclass(frozen=True)

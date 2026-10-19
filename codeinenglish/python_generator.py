@@ -1,7 +1,26 @@
 import ast
 
 from .errors import CodeInEnglishError
-from .ir import Assign, Binary, Compare, Display, Expr, If, Literal, Name, Program, ReadInput, Statement
+from .ir import (
+    Append,
+    Assign,
+    Binary,
+    Compare,
+    Contains,
+    CreateDictionary,
+    CreateList,
+    Display,
+    Expr,
+    ForEach,
+    If,
+    Index,
+    Literal,
+    Name,
+    Program,
+    ReadInput,
+    SetItem,
+    Statement,
+)
 
 
 _BINARY_OPERATORS = {
@@ -34,6 +53,18 @@ def _expression(node: Expr) -> ast.expr:
             left=_expression(node.left),
             ops=[_COMPARISON_OPERATORS[node.operator]()],
             comparators=[_expression(node.right)],
+        )
+    if isinstance(node, Index):
+        return ast.Subscript(
+            value=_expression(node.collection),
+            slice=_expression(node.index),
+            ctx=ast.Load(),
+        )
+    if isinstance(node, Contains):
+        return ast.Compare(
+            left=_expression(node.item),
+            ops=[ast.In()],
+            comparators=[_expression(node.collection)],
         )
     raise TypeError(f"unsupported expression IR node: {type(node).__name__}")
 
@@ -79,6 +110,57 @@ def _statements(nodes: list[Statement]) -> list[ast.stmt]:
                     test=_expression(node.condition),
                     body=_statements(node.body) or [ast.Pass()],
                     orelse=otherwise or ([ast.Pass()] if node.otherwise is not None else []),
+                )
+            )
+        elif isinstance(node, CreateList):
+            result.append(
+                ast.Assign(
+                    targets=[ast.Name(id=node.name, ctx=ast.Store())],
+                    value=ast.List(elts=[], ctx=ast.Load()),
+                )
+            )
+        elif isinstance(node, CreateDictionary):
+            result.append(
+                ast.Assign(
+                    targets=[ast.Name(id=node.name, ctx=ast.Store())],
+                    value=ast.Dict(keys=[], values=[]),
+                )
+            )
+        elif isinstance(node, Append):
+            result.append(
+                ast.Expr(
+                    value=ast.Call(
+                        func=ast.Attribute(
+                            value=ast.Name(id=node.collection, ctx=ast.Load()),
+                            attr="append",
+                            ctx=ast.Load(),
+                        ),
+                        args=[_expression(node.value)],
+                        keywords=[],
+                    )
+                )
+            )
+        elif isinstance(node, SetItem):
+            result.append(
+                ast.Assign(
+                    targets=[
+                        ast.Subscript(
+                            value=ast.Name(id=node.collection, ctx=ast.Load()),
+                            slice=_expression(node.index),
+                            ctx=ast.Store(),
+                        )
+                    ],
+                    value=_expression(node.value),
+                )
+            )
+        elif isinstance(node, ForEach):
+            result.append(
+                ast.For(
+                    target=ast.Name(id=node.name, ctx=ast.Store()),
+                    iter=_expression(node.collection),
+                    body=_statements(node.body) or [ast.Pass()],
+                    orelse=[],
+                    type_comment=None,
                 )
             )
         else:
