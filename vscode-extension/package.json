@@ -1,0 +1,65 @@
+{
+  "name": "codeinenglish-runner",
+  "displayName": "Code in English Runner",
+  "description": "Run Code in English .en problem files from VS Code.",
+  "version": "0.1.1",
+  "publisher": "anaslari23",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onLanguage:codeinenglish"
+  ],
+  "contributes": {
+    "taskDefinitions": [
+      {
+        "type": "codeinenglish",
+        "required": [],
+        "properties": {}
+      }
+    ],
+    "languages": [
+      {
+        "id": "codeinenglish",
+        "aliases": [
+          "Code in English",
+          "codeinenglish"
+        ],
+        "extensions": [
+          ".en"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "codeinenglish.runFile",
+        "title": "Run Code in English"
+      }
+    ],
+    "configuration": {
+      "title": "Code in English",
+      "properties": {
+        "codeinenglish.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Python executable used to generate and run Code in English files."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test",
+    "package": "vsce package --skip-license"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anaslari23/en-language.git"
+  }
+}
