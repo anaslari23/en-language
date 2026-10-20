@@ -80,17 +80,17 @@ flowchart LR
 
 ## Milestone 3: Make the shared program representation truly target-neutral
 
-**Purpose:** Let both source forms feed one program model that a second backend can consume.
+**Purpose:** Let both source forms feed typed semantic objects that a second backend can consume. The existing instruction `Program` and problem `ProblemSpec` are the two variants; a new low-level IR for every problem algorithm is deferred until a second backend proves it necessary.
 
 **Files:** `EN-Library/codeinenglish/ir.py`, `parser.py`, `problem_recognizer.py`, `problem_strategies.py`, `python_generator.py`, and focused tests.
 
-- [ ] Inventory current IR nodes and Python AST created directly by problem strategies. Record each construct needed by the existing 19 examples.
-- [ ] Define typed program, function, class, expression, control-flow, and input/output nodes with source locations and explicit semantics. Keep parsing separate from rendering.
-- [ ] Adapt the instruction parser and existing problem strategies to produce these nodes. Keep the Python backend's public behavior equivalent to the baseline.
-- [ ] For each example, compare generated Python behavior with the current implementation, including JSON input/output, empty inputs, and embedded examples.
-- [ ] Reject a request when the IR cannot represent a material constraint; do not silently discard it.
+- [x] Inventory current instruction IR nodes and the Python AST produced by problem strategies. The instruction parser already returns `Program`; the problem recognizer already returns `ProblemSpec`.
+- [x] Expose one `interpret_source(source, filename)` entry point that returns either `Program` or `ProblemSpec`, preserving front-end validation and source-located errors.
+- [x] Keep Python rendering behind typed functions for those two variants. Preserve existing `translate`, `solve`, and `generate` behavior.
+- [x] Compare generated Python behavior for every example with the current implementation, including JSON input/output, empty inputs, and embedded examples.
+- [x] Reject a request when its material constraint cannot be represented; never silently discard it.
 
-**Done when:** No problem strategy must construct Python AST directly, and the Python backend passes the baseline corpus from the shared representation.
+**Done when:** English recognition returns a typed `Program` or `ProblemSpec` before any Python AST is generated, and the Python backend passes the baseline corpus.
 
 ## Milestone 4: Grow English understanding by capability, not by memorized question
 

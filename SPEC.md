@@ -59,9 +59,9 @@ Each listed family has tested examples and accepted wording in EN-Library. New p
 ## Translation architecture
 
 1. Normalize input conservatively while retaining source locations for diagnostics.
-2. Parse English statements and expressions into a small, typed intermediate representation (IR); do not generate Python by substituting words directly into strings.
+2. Parse English statements and expressions into a typed `Program`, or recognize a comment request into a typed `ProblemSpec`. These are the two semantic forms returned before rendering.
 3. Resolve names and report unknown or ambiguous references with the `.en` line number.
-4. Generate Python from the IR and validate it with Python's built-in `ast` module before returning or writing it.
+4. Generate Python AST from the interpreted form and validate the rendered source with Python's built-in `ast` module before returning or writing it.
 5. Write output atomically so parsing, generation, or validation errors preserve existing files.
 
 Keep the grammar, IR, and Python generation small and explicit. Add phrase variations as aliases for existing meanings instead of duplicating translation logic.
