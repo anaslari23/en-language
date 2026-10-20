@@ -1,4 +1,4 @@
-import codeinpython library
+target python
 
 # Given a list of numbers and a target,
 # return the positions of two numbers that add up to the target.

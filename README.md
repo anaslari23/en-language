@@ -12,17 +12,17 @@ The translator is deterministic and offline at runtime. It uses no AI model or r
 Install the package into the Python interpreter you plan to use. This GitHub installation needs network access once:
 
 ```sh
-python3 -m pip install git+https://github.com/anaslari23/EN-Library.git
+python3 -m pip install git+https://github.com/anaslari23/EN-Library.git@feat/en-architecture
 ```
 
 To install from a local EN-Library checkout instead, run `python3 -m pip install .` from that checkout. Once installed, translation and generation work offline.
 
 ## Generate Python from a problem statement
 
-Create a `.en` file with the library directive and a problem statement in comments:
+Create a `.en` file with the target directive and a problem statement in comments:
 
 ```text
-import codeinpython library
+target python
 # Find two numbers that add up to the target.
 # Return their indices. Exactly one solution exists.
 # Example input: {"nums":[2,7,11,15],"target":9}
@@ -34,6 +34,8 @@ Generate an editable sibling `.py` file:
 ```sh
 python3 -m codeinenglish generate examples/two_sum_problem.en
 ```
+
+This writes `examples/two_sum_problem.py`. For the JSON input below, it prints `[0, 1]`.
 
 Check its embedded examples and run it with JSON input:
 
@@ -48,7 +50,9 @@ Use the same command for an instruction-style program such as `examples/greeter.
 python3 -m codeinenglish generate examples/greeter.en
 ```
 
-The exact `import codeinpython library` directive selects comment-based problem solving; without it, `generate` uses the instruction translator. The lower-level `translate` and `solve` commands remain available. Generation writes Python but does not execute it; the VS Code **Run** button separately starts generated Python after successful generation.
+`target python` selects Python output. When the remaining file contains only `#` comments, those comments form the problem request. When it contains English instructions, comments are documentation. Existing `import codeinpython library` problem files still work. Files without a directive still translate English instructions. The lower-level `translate` and `solve` commands remain available. Generation writes Python but does not execute it; the VS Code **Run** button separately starts generated Python after successful generation.
+
+Inside Python, `import codeinenglish` exposes the package API. To generate from a file, call `codeinenglish.generate_file("program.en")`; importing alone does not act on Python comments.
 
 See [SPEC.md](SPEC.md) for the language contract, supported forms, problem families, and limitations.
 

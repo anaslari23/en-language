@@ -1,4 +1,4 @@
-import codeinpython library
+target python
 
 # Find two numbers that add up to the target.
 # Return their indices.

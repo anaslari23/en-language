@@ -1,3 +1,4 @@
+target python
 # Classes, instance fields, methods, and return values.
 define a class called Greeter
 define a method called greet with parameter prefix

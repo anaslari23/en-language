@@ -62,8 +62,11 @@ async function runFile({ vscode, documentUri, pythonPath }) {
     vscode.window.showErrorMessage(`Could not read the .en file: ${error.message}`);
     return false;
   }
-  const hasExamples = /^\s*import\s+codeinpython\s+library\s*$/im.test(source)
-    && /^\s*#\s*Example input\s*:/im.test(source);
+  const sourceLines = source.split(/\r?\n/).map((line) => line.trim());
+  const isDirective = (line) => line === 'import codeinpython library' || /^target\s+python$/i.test(line);
+  const hasProblemDirective = sourceLines.some(isDirective);
+  const hasInstructions = sourceLines.some((line) => line && !line.startsWith('#') && !isDirective(line));
+  const hasExamples = hasProblemDirective && !hasInstructions && /^\s*#\s*Example input\s*:/im.test(source);
   const generatedPath = path.join(
     path.dirname(sourcePath),
     `${path.basename(sourcePath, path.extname(sourcePath))}.py`,

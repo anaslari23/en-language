@@ -37,9 +37,9 @@ flowchart LR
 
 ## Current starting point
 
-- EN-Library has an instruction parser, object-oriented constructs, 15 documented problem families, Python generation, `generate_file`, and `python -m codeinenglish generate` in the local staging copy. The language workspace has examples and a VS Code Run extension.
-- The latest local checks passed 110 Python tests, 19 extension tests, and generation of all 19 `.en` examples. This verifies the local copy only.
-- `/private/tmp/EN-Library-staging` and the current `en-language` folder are not Git checkouts. EN-Library changes are not in the GitHub repository. The first milestone must establish durable source checkouts or equivalent repository access before new implementation work.
+- At planning time, EN-Library had an instruction parser, object-oriented constructs, 15 documented problem families, Python generation, and `generate_file` only in a local staging copy. The language workspace had examples and a VS Code Run extension.
+- At planning time, 110 Python tests, 19 extension tests, and all 19 `.en` examples passed locally.
+- Both repositories have since been recovered and the verified baseline has been pushed to `feat/en-architecture` branches. The default branches have not been changed.
 
 ## Global constraints
 
@@ -56,11 +56,11 @@ flowchart LR
 
 **Files:** `EN-Library/codeinenglish/`, `EN-Library/tests/`, `EN-Library/pyproject.toml`, `en-language/SPEC.md`, `en-language/README.md`, and `en-language/vscode-extension/`.
 
-- [ ] Obtain or restore real checkouts for both repositories; record their branch, commit, remotes, and working-tree status. Do not overwrite existing user files.
-- [ ] Compare the EN-Library checkout with `/private/tmp/EN-Library-staging` and the language checkout with the current workspace; apply only missing changes and inspect the diffs.
-- [ ] Build and install EN-Library in a fresh virtual environment; confirm that `import codeinenglish` and `python -m codeinenglish generate` work outside the checkout.
-- [ ] Run the Python suite, extension suite, and all `.en` examples against the checked-out sources. The accepted baseline is 110 Python tests, 19 extension tests, and 19 generating examples unless the recovered branches have moved forward.
-- [ ] Commit the two repositories separately once their contents and test evidence are reviewed. Publishing packages and merging remote branches are separate release decisions.
+- [x] Obtain or restore real checkouts for both repositories; record their branch, commit, remotes, and working-tree status. Do not overwrite existing user files.
+- [x] Compare the EN-Library checkout with `/private/tmp/EN-Library-staging` and the language checkout with the current workspace; apply only missing changes and inspect the diffs.
+- [x] Build and install EN-Library in a fresh virtual environment; confirm that `import codeinenglish` and `python -m codeinenglish generate` work outside the checkout.
+- [x] Run the Python suite, extension suite, and all `.en` examples against the checked-out sources. The accepted baseline is 110 Python tests, 19 extension tests, and 19 generating examples unless the recovered branches have moved forward.
+- [x] Commit the two repositories separately once their contents and test evidence are reviewed. Publishing packages and merging remote branches are separate release decisions.
 
 **Done when:** Neither repository depends on a temporary staging directory, and a clean installation reproduces the documented Greeter and Two Sum workflows offline.
 
@@ -70,11 +70,11 @@ flowchart LR
 
 **Files:** `en-language/SPEC.md`, `en-language/examples/`, `EN-Library/codeinenglish/problem_prompt.py`, `EN-Library/codeinenglish/interpreter.py`, `EN-Library/codeinenglish/__main__.py`, and corresponding tests.
 
-- [ ] Specify a canonical target directive such as `target python`; continue accepting `import codeinpython library` as a compatibility alias. Reject conflicting or unknown targets with file and line information.
-- [ ] Specify the two request forms: English instructions on ordinary lines, and a high-level problem request on `#` comment lines. Define which comments are documentation versus a request.
-- [ ] Keep one command: `python -m codeinenglish generate FILE.en [--output PATH]`. Document the equivalent `codeinenglish.generate_file(...)` Python API.
-- [ ] Add meaningful file-level cases for omitted target, conflicting directives, malformed comments, paths with spaces, and failed generation preserving an existing output.
-- [ ] Rewrite the first-run guide around two complete examples: a class-based Greeter and a short comment request for Two Sum. Show generated output and how to run it.
+- [x] Specify a canonical target directive such as `target python`; continue accepting `import codeinpython library` as a compatibility alias. Reject conflicting or unknown targets with file and line information.
+- [x] Specify the two request forms: English instructions on ordinary lines, and a high-level problem request on `#` comment lines. Define which comments are documentation versus a request.
+- [x] Keep one command: `python -m codeinenglish generate FILE.en [--output PATH]`. Document the equivalent `codeinenglish.generate_file(...)` Python API.
+- [x] Add meaningful file-level cases for omitted target, conflicting directives, malformed comments, paths with spaces, and failed generation preserving an existing output.
+- [x] Rewrite the first-run guide around two complete examples: a class-based Greeter and a short comment request for Two Sum. Show generated output and how to run it.
 
 **Done when:** A new user can identify the file extension, write either accepted form, generate Python, and understand a refusal without learning Python syntax.
 

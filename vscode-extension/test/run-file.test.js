@@ -78,6 +78,24 @@ test('runs unified generation then embedded example check with workspace cwd', a
   assert.equal(env.information.length, 1);
 });
 
+test('checks examples in a canonical Python-target problem file', async (t) => {
+  const env = await fixture({ source: 'target python\n# Find two numbers that add to target and return indices.\n# Example input: {"nums":[2,7],"target":9}\n# Example output: [0,1]\n' });
+  t.after(env.dispose);
+
+  await runFile(env.args);
+
+  assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.py'), '--check-examples']);
+});
+
+test('runs canonical instructions when their comments mention example input', async (t) => {
+  const env = await fixture({ source: 'target python\n# Example input: Ada\nshow "Hello Ada"\n' });
+  t.after(env.dispose);
+
+  await runFile(env.args);
+
+  assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.py')]);
+});
+
 test('starts generated problem code without flags when no examples are present', async (t) => {
   const env = await fixture();
   t.after(env.dispose);

@@ -2,7 +2,7 @@
 
 This extension adds a **▶ Run** CodeLens to `.en` files. It calls the separately installed `codeinenglish` Python package to generate a sibling `.py` file, then checks embedded examples or starts the generated program in the integrated terminal.
 
-The extension calls one `codeinenglish generate` command. The exact `import codeinpython library` directive selects the DSA problem solver; other `.en` files use the instruction translator, so programs such as `greeter.en` run through the same entry point.
+The extension calls one `codeinenglish generate` command. A standalone `target python` directive selects Python output: comment-only files request a problem solution, while files with English instructions run as programs. The older `import codeinpython library` problem directive also works.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ The extension calls one `codeinenglish generate` command. The exact `import code
 Install EN-Library into your chosen interpreter. The GitHub command needs network access for installation; the package itself works offline after installation:
 
 ```sh
-python3 -m pip install git+https://github.com/anaslari23/EN-Library.git
+python3 -m pip install git+https://github.com/anaslari23/EN-Library.git@feat/en-architecture
 ```
 
 If you installed the package into a virtual environment, configure the extension to use that environment's Python executable. For example:
@@ -45,9 +45,9 @@ This creates a versioned VSIX. In VS Code, open the Extensions view, select the 
 
 Open a saved `.en` file in a workspace and click **▶ Run** above the prompt.
 
-- With `import codeinpython library` and `Example input:` / `Example output:` comments, the extension generates the problem solution and runs `--check-examples`; the terminal reports whether the examples passed.
-- With the library directive and no examples, it generates a DSA solution and starts it in the integrated terminal. Enter one JSON object matching the generated function's arguments, then press Return.
-- Without the library directive, it translates the `.en` program through `generate` and starts the generated Python in the integrated terminal.
+- With `target python` and a comment-only problem request, the extension generates a solution. If there are `Example input:` / `Example output:` comments, it runs `--check-examples`.
+- With a problem request and no examples, it starts the generated solution in the integrated terminal. Enter one JSON object matching the generated function's arguments, then press Return.
+- With English instruction lines, it translates and starts the resulting Python. Comments in such a file are documentation.
 
 The generated `.py` file is saved beside the `.en` source. The extension does not edit the source. It does not start generated Python unless generation succeeds.
 
