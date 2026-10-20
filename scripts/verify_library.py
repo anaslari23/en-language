@@ -25,23 +25,23 @@ def main():
     with tempfile.TemporaryDirectory(prefix="codeinenglish-check-") as temporary:
         outside = Path(temporary)
         greeting = outside / "greeter.py"
-        translated = run(
-            ["-m", "codeinenglish", "translate", EXAMPLES / "greeter.en", "--output", greeting],
+        generated_greeter = run(
+            ["-m", "codeinenglish", "generate", EXAMPLES / "greeter.en", "--output", greeting],
             cwd=outside,
         )
-        if translated.returncode:
-            raise SystemExit(f"greeter translation failed:\n{translated.stderr}")
+        if generated_greeter.returncode:
+            raise SystemExit(f"greeter generation failed:\n{generated_greeter.stderr}")
         greeting_run = run([greeting], cwd=outside)
         if greeting_run.returncode or greeting_run.stdout.strip() != "Hello Ada":
             raise SystemExit(f"greeter output mismatch: {greeting_run.stdout!r}\n{greeting_run.stderr}")
 
         solution = outside / "two_sum.py"
-        solved = run(
-            ["-m", "codeinenglish", "solve", EXAMPLES / "two_sum_problem.en", "--output", solution],
+        generated_problem = run(
+            ["-m", "codeinenglish", "generate", EXAMPLES / "two_sum_problem.en", "--output", solution],
             cwd=outside,
         )
-        if solved.returncode:
-            raise SystemExit(f"Two Sum generation failed:\n{solved.stderr}")
+        if generated_problem.returncode:
+            raise SystemExit(f"Two Sum generation failed:\n{generated_problem.stderr}")
         checked = run([solution, "--check-examples"], cwd=outside)
         if checked.returncode or "All 1 examples passed." not in checked.stdout:
             raise SystemExit(f"Two Sum example check failed:\n{checked.stdout}\n{checked.stderr}")

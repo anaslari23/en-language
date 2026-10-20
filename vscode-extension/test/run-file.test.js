@@ -8,7 +8,7 @@ const { runFile } = require('../src/run-file');
 async function fixture({ source, exitCodes = [0, 0], workspace = true, pythonPath = 'python3', executeError } = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'codeinenglish run '));
   const sourcePath = path.join(directory, 'my problem.en');
-  await fs.writeFile(sourcePath, source ?? '# Find two numbers that add up to target and return indices.\n', 'utf8');
+  await fs.writeFile(sourcePath, source ?? 'import codeinpython library\n# Find two numbers that add up to target and return indices.\n', 'utf8');
   const folder = { uri: { fsPath: directory }, name: 'workspace' };
   const tasks = [];
   const errors = [];
@@ -63,14 +63,14 @@ async function fixture({ source, exitCodes = [0, 0], workspace = true, pythonPat
   };
 }
 
-test('runs solve then embedded example check with workspace cwd', async (t) => {
-  const env = await fixture({ source: '# Example input: {"nums":[2,7],"target":9}\n# Example output: [0,1]\n' });
+test('runs unified generation then embedded example check with workspace cwd', async (t) => {
+  const env = await fixture({ source: 'import codeinpython library\n# Example input: {"nums":[2,7],"target":9}\n# Example output: [0,1]\n' });
   t.after(env.dispose);
 
   await runFile(env.args);
 
   assert.equal(env.tasks.length, 2);
-  assert.deepEqual(env.tasks[0].execution.args, ['-m', 'codeinenglish', 'solve', env.sourcePath]);
+  assert.deepEqual(env.tasks[0].execution.args, ['-m', 'codeinenglish', 'generate', env.sourcePath]);
   assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.py'), '--check-examples']);
   assert.equal(env.tasks[0].execution.options.cwd, env.directory);
   assert.equal(env.tasks[0].presentationOptions.focus, true);
@@ -78,26 +78,39 @@ test('runs solve then embedded example check with workspace cwd', async (t) => {
   assert.equal(env.information.length, 1);
 });
 
-test('starts the generated program without flags when no examples are present', async (t) => {
+test('starts generated problem code without flags when no examples are present', async (t) => {
   const env = await fixture();
   t.after(env.dispose);
 
   await runFile(env.args);
 
   assert.deepEqual(env.tasks.map((task) => task.execution.args), [
-    ['-m', 'codeinenglish', 'solve', env.sourcePath],
+    ['-m', 'codeinenglish', 'generate', env.sourcePath],
     [env.sourcePath.replace(/\.en$/, '.py')],
   ]);
 });
 
-test('keeps paths with spaces as individual process arguments', async (t) => {
-  const env = await fixture({ source: '# Example input: {}\n# Example output: null\n', pythonPath: '/custom python/python' });
+test('generates regular Code in English programs before running them', async (t) => {
+  const env = await fixture({ source: 'show "Hello Ada"\n' });
+  t.after(env.dispose);
+
+  await runFile(env.args);
+
+  assert.deepEqual(env.tasks.map((task) => task.execution.args), [
+    ['-m', 'codeinenglish', 'generate', env.sourcePath],
+    [env.sourcePath.replace(/\.en$/, '.py')],
+  ]);
+});
+
+test('preserves paths with spaces and configured Python path as separate process arguments', async (t) => {
+  const env = await fixture({ source: 'import codeinpython library\n# Example input: {}\n# Example output: null\n', pythonPath: '/custom python/python' });
   t.after(env.dispose);
 
   await runFile(env.args);
 
   assert.equal(env.tasks[0].execution.process, '/custom python/python');
-  assert.equal(env.tasks[0].execution.args[3], env.sourcePath);
+  assert.deepEqual(env.tasks[0].execution.args, ['-m', 'codeinenglish', 'generate', env.sourcePath]);
+  assert.equal(env.tasks[0].execution.options.cwd, env.directory);
   assert.equal(env.tasks[1].execution.args[0], env.sourcePath.replace(/\.en$/, '.py'));
 });
 
@@ -112,7 +125,7 @@ test('does not execute stale output when generation fails', async (t) => {
 });
 
 test('reports a failing embedded example check', async (t) => {
-  const env = await fixture({ source: '# Example input: {}\n# Example output: null\n', exitCodes: [0, 1] });
+  const env = await fixture({ source: 'import codeinpython library\n# Example input: {}\n# Example output: null\n', exitCodes: [0, 1] });
   t.after(env.dispose);
 
   await runFile(env.args);

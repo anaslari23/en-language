@@ -2,6 +2,8 @@
 
 This extension adds a **▶ Run** CodeLens to `.en` files. It calls the separately installed `codeinenglish` Python package to generate a sibling `.py` file, then checks embedded examples or starts the generated program in the integrated terminal.
 
+The extension calls one `codeinenglish generate` command. The exact `import codeinpython library` directive selects the DSA problem solver; other `.en` files use the instruction translator, so programs such as `greeter.en` run through the same entry point.
+
 ## Requirements
 
 - VS Code 1.80 or newer.
@@ -37,14 +39,15 @@ npm test
 npm run package
 ```
 
-This creates `codeinenglish-runner-0.1.1.vsix`. In VS Code, open the Extensions view, select the `...` menu, choose **Install from VSIX...**, and select the generated file. To update the extension, build and install the new VSIX the same way.
+This creates a versioned VSIX. In VS Code, open the Extensions view, select the `...` menu, choose **Install from VSIX...**, and select the generated file. To update the extension, build and install the new VSIX the same way.
 
 ## Use
 
 Open a saved `.en` file in a workspace and click **▶ Run** above the prompt.
 
-- With `Example input:` / `Example output:` comments, the extension asks EN-Library to generate Python and runs `--check-examples`; the terminal reports whether the examples passed.
-- Without examples, it generates Python and starts it in the integrated terminal. Enter one JSON object matching the generated function's arguments, then press Return.
+- With `import codeinpython library` and `Example input:` / `Example output:` comments, the extension generates the problem solution and runs `--check-examples`; the terminal reports whether the examples passed.
+- With the library directive and no examples, it generates a DSA solution and starts it in the integrated terminal. Enter one JSON object matching the generated function's arguments, then press Return.
+- Without the library directive, it translates the `.en` program through `generate` and starts the generated Python in the integrated terminal.
 
 The generated `.py` file is saved beside the `.en` source. The extension does not edit the source. It does not start generated Python unless generation succeeds.
 

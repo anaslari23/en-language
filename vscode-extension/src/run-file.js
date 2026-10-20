@@ -62,7 +62,8 @@ async function runFile({ vscode, documentUri, pythonPath }) {
     vscode.window.showErrorMessage(`Could not read the .en file: ${error.message}`);
     return false;
   }
-  const hasExamples = /^\s*#\s*Example input\s*:/im.test(source);
+  const hasExamples = /^\s*import\s+codeinpython\s+library\s*$/im.test(source)
+    && /^\s*#\s*Example input\s*:/im.test(source);
   const generatedPath = path.join(
     path.dirname(sourcePath),
     `${path.basename(sourcePath, path.extname(sourcePath))}.py`,
@@ -73,7 +74,7 @@ async function runFile({ vscode, documentUri, pythonPath }) {
       vscode,
       workspaceFolder,
       pythonPath,
-      ['-m', 'codeinenglish', 'solve', sourcePath],
+      ['-m', 'codeinenglish', 'generate', sourcePath],
       `generate ${path.basename(sourcePath)}`,
     );
     const generationExit = await executeAndWait(vscode, generateTask);

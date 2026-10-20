@@ -5,7 +5,7 @@ Code in English lets you write supported instructions or DSA problem statements 
 - [en-language](https://github.com/anaslari23/en-language) contains the language spec, examples, and VS Code extension.
 - [EN-Library](https://github.com/anaslari23/EN-Library) contains the `codeinenglish` Python package and its tests.
 
-The translator is deterministic and offline at runtime. It uses no AI model or runtime dependencies, does not contact a network service, and never executes generated code. Its English recognition is rule-based and limited to documented forms and problem families; unsupported or ambiguous requests produce a diagnostic.
+The translator is deterministic and offline at runtime. It uses no AI model or runtime dependencies and does not contact a network service. Its English recognition is rule-based and limited to documented forms and problem families; unsupported or ambiguous requests produce a diagnostic.
 
 ## Set up the Python library
 
@@ -32,7 +32,7 @@ import codeinpython library
 Generate an editable sibling `.py` file:
 
 ```sh
-python3 -m codeinenglish solve examples/two_sum_problem.en
+python3 -m codeinenglish generate examples/two_sum_problem.en
 ```
 
 Check its embedded examples and run it with JSON input:
@@ -42,7 +42,13 @@ python3 examples/two_sum_problem.py --check-examples
 echo '{"nums":[2,7,11,15],"target":9}' | python3 examples/two_sum_problem.py
 ```
 
-The generator writes Python but does not execute it. Review the generated file before running it. For supported programming instructions rather than a DSA problem, use `python3 -m codeinenglish translate program.en`.
+Use the same command for an instruction-style program such as `examples/greeter.en`:
+
+```sh
+python3 -m codeinenglish generate examples/greeter.en
+```
+
+The exact `import codeinpython library` directive selects comment-based problem solving; without it, `generate` uses the instruction translator. The lower-level `translate` and `solve` commands remain available. Generation writes Python but does not execute it; the VS Code **Run** button separately starts generated Python after successful generation.
 
 See [SPEC.md](SPEC.md) for the language contract, supported forms, problem families, and limitations.
 
@@ -57,7 +63,7 @@ npm test
 npm run package
 ```
 
-In VS Code, choose **Install from VSIX...** from the Extensions view and select the generated `.vsix`. Set `codeinenglish.pythonPath` to the exact interpreter where you installed EN-Library. The extension then adds **▶ Run** to `.en` files. See the [extension guide](vscode-extension/README.md).
+In VS Code, choose **Install from VSIX...** from the Extensions view and select the generated `.vsix`. Set `codeinenglish.pythonPath` to the exact interpreter where you installed EN-Library. The extension adds **▶ Run** to `.en` files and calls the unified `generate` command; the directive selects problem solving, and other supported `.en` programs use the instruction translator. See the [extension guide](vscode-extension/README.md).
 
 ## Verify the integration
 
