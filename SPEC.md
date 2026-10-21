@@ -24,7 +24,7 @@ Generated solutions include the callable algorithm function and a main() wrapper
 
 Every generated file includes an interpreted function signature and lists material assumptions as stated or defaulted. The solution contract documents edge behavior, including first-pair selection and null when no pair exists, first matching search index and -1 when absent, case-sensitive text comparison by default, and empty-input behavior. Conflicting or unsupported behavior requests fail with a source-located diagnostic.
 
-Supported problem families now include pair-sum indices; duplicate detection; per-value frequencies; palindrome; anagram; sorted binary search; minimum, maximum, and sum; first unique character; reverse text; move zeros to the end; merge sorted lists; maximum contiguous subarray sum; and balanced delimiters. This growing fixed catalog does not guarantee understanding of arbitrary English. Prompt examples, strategy reference tests, and syntax validation provide evidence but cannot prove that every novel wording was understood as intended.
+Supported problem families now include pair-sum indices; duplicate detection; per-value frequencies; palindrome; anagram; sorted binary search; minimum, maximum, and sum; first unique character; reverse text; move zeros to the end; merge sorted lists; maximum contiguous subarray sum; balanced delimiters; and ascending numeric sort. This growing fixed catalog does not guarantee understanding of arbitrary English. Prompt examples, strategy reference tests, and syntax validation provide evidence but cannot prove that every novel wording was understood as intended.
 
 ## What “understand English” means here
 
@@ -53,8 +53,9 @@ The comment-based problem path currently recognizes these deterministic problem 
 | Merge sorted lists | two ascending integer lists | one ascending merged list |
 | Maximum subarray sum | integer list | largest sum of a contiguous segment |
 | Balanced delimiters | text | whether brackets and parentheses are balanced |
+| Ascending sort | integer list | a new list ordered from smallest to largest, preserving duplicates |
 
-Each listed family has tested examples and accepted wording in EN-Library. New phrasing and problem families need explicit rules and tests; unsupported or ambiguous wording produces a diagnostic.
+Each listed family has tested examples and accepted wording in EN-Library. The capability registry is `ProblemFamily` with its input and assumption mappings in `problem_recognizer.py`; the independently written `tests/fixtures/prompt_corpus.json` records representative accepted and rejected phrasings. For version 0.1.4, all 24 accepted corpus prompts map to their intended family and all 8 ambiguous or unsupported prompts are rejected. New phrasing and problem families need explicit rules and tests; unsupported or ambiguous wording produces a diagnostic.
 
 ## Translation architecture
 

@@ -98,10 +98,10 @@ flowchart LR
 
 **Files:** `EN-Library/codeinenglish/parser.py`, `expressions.py`, `problem_recognizer.py`, `problem_strategies.py`, `tests/`, plus `en-language/SPEC.md` and `examples/`.
 
-- [ ] Maintain a capability registry listing accepted intent, inputs, output, constraints, defaults, and representative phrasings for each family or language construct.
-- [ ] Choose one missing capability at a time from real user requests. Add independent paraphrases, boundary cases, contradictory requests, and generated-behavior checks before marking it supported.
-- [ ] Add plain-English diagnostics that state which detail is missing or unsupported; never replace a successful old `.py` with partial new code.
-- [ ] Measure coverage with an independently written prompt corpus, including cases that must be rejected. Publish the corpus and actual pass/fail counts with releases.
+- [x] Maintain a capability registry listing accepted intent, inputs, output, constraints, defaults, and representative phrasings for each family or language construct.
+- [x] Choose one missing capability at a time from real user requests. Add independent paraphrases, boundary cases, contradictory requests, and generated-behavior checks before marking it supported.
+- [x] Add plain-English diagnostics that state which detail is missing or unsupported; never replace a successful old `.py` with partial new code.
+- [x] Measure coverage with an independently written prompt corpus, including cases that must be rejected. Publish the corpus and actual pass/fail counts with releases.
 
 **Done when:** Coverage claims name specific supported capabilities and their measured examples; unfamiliar requests fail honestly.
 
