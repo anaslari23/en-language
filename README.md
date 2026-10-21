@@ -81,6 +81,10 @@ npm run package
 
 In VS Code, choose **Install from VSIX...** from the Extensions view and select the generated `.vsix`. Set `codeinenglish.pythonPath` to the exact interpreter where you installed EN-Library. The extension adds **▶ Run** to `.en` files and calls the unified `generate` command; the directive selects problem solving, and other supported `.en` programs use the instruction translator. See the [extension guide](vscode-extension/README.md).
 
+## Other editors
+
+The CLI works from any editor with a terminal or external-tool command. Open the folder containing your `.en` file, then run `python3 -m codeinenglish generate PATH/TO/FILE.en`. Run the generated `.py` with Python or `.js` with Node.js. The interpreter runs locally after installation; an editor plugin is only a shortcut for these commands.
+
 ## Verify the integration
 
 With the package installed into the active interpreter, run:

@@ -122,10 +122,10 @@ flowchart LR
 
 **Purpose:** Let people use the interpreter from their preferred development environment and install a stable release.
 
-- [ ] Keep the CLI as the editor-independent interface. VS Code uses it through the existing extension; other IDEs can use an external-tool or task configuration first.
-- [ ] Add an editor protocol or dedicated extension only when a specific editor needs features that a CLI task cannot provide, such as inline diagnostics.
-- [ ] Verify package name, metadata, wheel contents, supported Python versions, and installation instructions in clean environments.
-- [ ] Prepare separate PyPI and extension Marketplace release checklists. Publication needs reviewed artifacts and explicit release authorization.
+- [x] Keep the CLI as the editor-independent interface. VS Code uses it through the existing extension; other IDEs can use an external-tool or task configuration first.
+- [x] Add an editor protocol or dedicated extension only when a specific editor needs features that a CLI task cannot provide, such as inline diagnostics.
+- [x] Verify package name, metadata, wheel contents, supported Python versions, and installation instructions in clean environments.
+- [x] Prepare separate PyPI and extension Marketplace release checklists. The release artifacts and checklist are prepared; public publication remains a separate action.
 
 **Done when:** A clean install can translate without network access, and each advertised IDE has a demonstrated launch path.
 
