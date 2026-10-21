@@ -4,7 +4,7 @@
 
 **Goal:** Give users one dependable, model-free workflow for translating supported `.en` instructions and problem descriptions into reviewable Python, from the command line or VS Code.
 
-**Architecture:** Keep `EN-Library` as the sole interpreter implementation. Its deterministic front ends parse instruction-style English and comment-based problem requests into structured representations, then a shared Python generator emits validated source. Keep the VS Code extension in `en-language` as a thin client of the installed package; keep other output-language backends as a later, separately planned milestone.
+**Architecture:** Keep `EN-Library` as the sole compiler implementation. Its deterministic front ends parse instruction-style English and comment-based problem requests into a shared `Program` IR; Python and future backends render only that IR. The reference evaluator also consumes `Program` for conformance checks. Keep the VS Code extension in `en-language` as a thin client of the installed package. This is the initial implementation plan; the updated [architecture roadmap](2026-10-20-en-architecture-roadmap.md) and [review follow-up](2026-10-21-architecture-review-follow-up.md) record the shared IR work still required.
 
 **Tech Stack:** Python 3.10+ standard library; `argparse`, Python `ast`, `unittest`; VS Code Extension API and Node.js built-in test runner; `pip` packaging.
 
@@ -16,7 +16,7 @@
 - State supported wording and constructs honestly; deterministic rules do not promise to translate arbitrary English.
 - Preserve the public `codeinenglish` import name and existing `translate`, `translate_file`, `solve`, and `solve_file` behavior.
 - Generate ordinary Python, validate it with `ast.parse`, and never execute it during translation.
-- Keep the single maintained interpreter implementation in `EN-Library`; do not vendor it into `en-language` or the VS Code extension.
+- Keep the single maintained compiler implementation in `EN-Library`; do not vendor it into `en-language` or the VS Code extension.
 - Reject unsupported, ambiguous, conflicting, and malformed requests with source-located diagnostics; failed generation must preserve existing output files.
 - Use independently authored English examples; do not scrape or copy problem statements.
 - The first release target is Python. A second language backend requires its own design and conformance plan after the shared representation is stable.

@@ -1,8 +1,8 @@
-# Code in English: offline English-to-Python translator
+# Code in English: offline English-to-Python compiler
 
 ## Goal
 
-Let a user describe a program in supported, ordinary English in a `.en` file and generate editable Python source. The translator is a pure-Python library and command-line tool that works offline without an AI model, network connection, or runtime dependencies.
+Let a user describe a program in supported, ordinary English in a `.en` file and generate editable Python source. The compiler is a pure-Python library and command-line tool that works offline without an AI model, network connection, or runtime dependencies.
 
 ## Product contract
 
@@ -16,7 +16,7 @@ Let a user describe a program in supported, ordinary English in a `.en` file and
 
 ## Comment-based problem generation
 
-The canonical standalone directive is `target python`. With that directive, a file containing only blank lines and `#` comments is a problem request; a file with ordinary English instruction lines is an instruction program, and its comments are documentation. The existing exact `import codeinpython library` directive remains a problem-file alias. Without a directive, `generate` continues to treat the file as English instructions. Only one directive is allowed. Other targets are currently unsupported.
+The current 0.1 source contract uses `target python` to select a problem request; `import codeinpython library` remains a legacy problem-file alias. Headerless files retain their existing 0.1 interpretation during migration. The next source version is planned to use an explicit `en 0.2` header and require `#?` to mark a problem request; ordinary `#` comments will be documentation. This versioned marker contract is planned and is not implemented in the current release. Unknown source versions will be rejected, and any future removal of legacy syntax must follow a documented deprecation period. Only Python output is currently supported for the full source contract.
 
 `solve(source)` returns Python source and `solve_file(path, output_path=None)` writes a sibling `.py` by default. `generate_file` and `python3 -m codeinenglish generate SOURCE [--output PATH]` select the appropriate path from the source contract. Directives are not included in generated Python. A Python `import codeinenglish` exposes the package API; it does not execute Python comments. This problem path is a curated deterministic recognizer and strategy library, not an unrestricted English translator.
 
@@ -28,15 +28,21 @@ Supported problem families now include pair-sum indices; duplicate detection; pe
 
 ## What “understand English” means here
 
-The translator uses deterministic parsing rules, vocabulary, and grammar. It should accept multiple documented English phrasings for the same programming intent, including common synonyms and harmless variations in word order. It will translate only requests it can map to a supported program structure. It must explain unsupported or ambiguous requests rather than silently inventing behavior.
+The compiler uses deterministic parsing rules, vocabulary, and grammar. It should accept multiple documented English phrasings for the same programming intent, including common synonyms and harmless variations in word order. It will translate only requests it can map to a supported program structure. It must explain unsupported or ambiguous requests rather than silently inventing behavior.
 
 This is not a claim that fixed offline rules can understand every possible English sentence. Supported grammar and examples are part of the product interface and should grow over time.
+
+## Source version migration
+
+The current released syntax is treated as source version 0.1. Existing files without a version header keep their current behavior, including the explicit `target python` and legacy `import codeinpython library` problem directives. Do not reinterpret those files as the language evolves. The planned 0.2 syntax will use an `en 0.2` header; only a `#?` comment block will request problem generation, while `#` remains documentation. The compiler will reject unknown version headers. The project will announce deprecations in release notes and documentation, retain a deprecated form for at least one minor release cycle, and provide a migration note before removal. These 0.2 rules are design commitments, not current behavior.
+
+The PyPI distribution name and Python import name are separate: the intended distribution candidate is `codeinenglish`, and the module remains `codeinenglish`. A read-only PyPI lookup on 2026-10-21 found no published project records for either `en` or `codeinenglish`; this does not reserve either name or guarantee PyPI will accept it at release time. Recheck availability and policy before publishing. Avoid the generic `en` distribution name.
 
 ## Current capability inventory
 
 `target javascript` selects the first JavaScript backend. It currently accepts instruction programs composed of text, boolean, null, and exact integer literal/name assignments plus `show`; floating-point literals are not yet supported. The problem path supports ascending numeric sort with integers in JavaScript's exact Number range. It writes a sibling `.js` file. The problem runner reads one JSON object from standard input and prints JSON, or checks embedded examples with `--check-examples`. Other instruction nodes and problem families produce an unsupported diagnostic before an output file is changed. The legacy `import codeinpython library` directive remains Python-only.
 
-The instruction translator currently accepts documented forms for variables and values, arithmetic/comparison expressions, input and output, `if`/`otherwise`, `for each` loops over lists, list/dictionary creation and updates, indexing, and classes with methods, instance fields, calls, and returns. It does not claim arbitrary Python syntax or unrestricted English.
+The instruction front end currently accepts documented forms for variables and values, arithmetic/comparison expressions, input and output, `if`/`otherwise`, `for each` loops over lists, list/dictionary creation and updates, indexing, and classes with methods, instance fields, calls, and returns. It does not claim arbitrary Python syntax or unrestricted English.
 
 The comment-based problem path currently recognizes these deterministic problem families:
 
@@ -57,15 +63,15 @@ The comment-based problem path currently recognizes these deterministic problem 
 | Balanced delimiters | text | whether brackets and parentheses are balanced |
 | Ascending sort | integer list | a new list ordered from smallest to largest, preserving duplicates |
 
-Each listed family has tested examples and accepted wording in EN-Library. The capability registry is `ProblemFamily` with its input and assumption mappings in `problem_recognizer.py`; the independently written `tests/fixtures/prompt_corpus.json` records representative accepted and rejected phrasings. For version 0.1.4, all 24 accepted corpus prompts map to their intended family and all 8 ambiguous or unsupported prompts are rejected. New phrasing and problem families need explicit rules and tests; unsupported or ambiguous wording produces a diagnostic.
+Each listed family has maintainer-authored regression examples and accepted wording in EN-Library. The capability registry is `ProblemFamily` with its input and assumption mappings in `problem_recognizer.py`; `tests/fixtures/prompt_corpus.json` records representative accepted and rejected phrasings. For version 0.1.4, all 24 accepted corpus prompts map to their intended family and all 8 ambiguous or unsupported prompts are rejected. These are internal regression results, not independent evidence of user coverage. Before making broad understanding claims, collect a separate held-out prompt set from at least three independent testers and report its results separately. New phrasing and problem families need explicit rules and tests; unsupported or ambiguous wording produces a diagnostic.
 
-## Translation architecture
+## Compiler architecture
 
 1. Normalize input conservatively while retaining source locations for diagnostics.
-2. Parse English statements and expressions into a typed `Program`, or recognize a comment request into a typed `ProblemSpec`. These are the two semantic forms returned before rendering.
+2. Parse English statements into a typed `Program`; recognize a marked request into `ProblemSpec`, then lower its selected strategy into the same `Program` IR. `ProblemSpec` preserves intent and constraints before lowering and is never consumed directly by a backend.
 3. Resolve names and report unknown or ambiguous references with the `.en` line number.
-4. Generate Python AST from the interpreted form and validate the rendered source with Python's built-in `ast` module before returning or writing it.
-5. Write output atomically so parsing, generation, or validation errors preserve existing files.
+4. Render Python from `Program` and validate it with Python's built-in `ast` module before returning or writing it. Future backends and the reference evaluator will also consume `Program` only.
+5. Write output atomically and include compiler/source-version metadata plus a source-line map so generated-code diagnostics can point back to the `.en` file. Source mapping and the shared problem IR are planned architecture work; the current implementation does not yet provide them.
 
 Keep the grammar, IR, and Python generation small and explicit. Add phrase variations as aliases for existing meanings instead of duplicating translation logic.
 

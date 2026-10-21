@@ -4,11 +4,11 @@
 
 **Goal:** Let a beginner write supported English instructions or a supported problem request in a `.en` file and obtain editable code entirely offline, starting with Python.
 
-**Architecture:** EN-Library owns one deterministic interpreter. It reads `.en` source, selects either the instruction-language parser or the problem-request recognizer, converts the result to a target-neutral program representation, and passes that representation to a language backend. The `en-language` repository owns the language contract, examples, and editor integrations. The command line is the common entry point for editors and future host-language adapters.
+**Architecture:** EN-Library owns the deterministic compiler and target-neutral `Program` IR. Instruction parsing and problem-intent recognition both lower to `Program`; one Python or JavaScript backend renders it, and a reference evaluator executes it for conformance checks. `ProblemSpec` remains intent metadata and is not a backend input. The `en-language` repository owns the source contract, examples, and editor integrations.
 
-**Tech stack:** Python 3.10+ standard library for the interpreter and CLI; existing Node.js VS Code extension; `unittest` and independent example programs for verification.
+**Tech stack:** Python 3.10+ standard library for the compiler and CLI; existing Node.js VS Code extension; `unittest` and maintainer regression programs for verification.
 
-**Existing design:** [language specification](../../SPEC.md), [offline interpreter plan](2026-10-20-offline-interpreter.md), and [repository split design](../specs/2026-10-19-library-language-repository-split-design.md).
+**Existing design:** [language specification](../../SPEC.md), [offline compiler plan](2026-10-20-offline-interpreter.md), and [repository split design](../specs/2026-10-19-library-language-repository-split-design.md).
 
 ## What the diagram means in the product
 
@@ -17,23 +17,26 @@ flowchart LR
     A[.en file] --> B[Source reader and target selector]
     B --> C{Request form}
     C -->|English steps| D[Instruction parser]
-    C -->|Comment request| E[Problem recognizer and strategy]
-    D --> F[Target-neutral program representation]
-    E --> F
-    F --> G{Backend}
-    G --> H[Python source]
-    G --> I[Later: JavaScript source]
-    J[CLI] --> B
-    K[IDE adapter] --> J
-    L[Host-language adapter] --> J
+    C -->|Marked comment request| E[Problem recognizer]
+    D --> F[Target-neutral Program IR]
+    E --> G[ProblemSpec]
+    G --> F
+    F --> H{Backend or reference evaluator}
+    H --> I[Python source]
+    H --> J[JavaScript source]
+    K[CLI] --> B
+    L[IDE adapter] --> K
+    M[Host-language adapter] --> K
 ```
 
-- `.en` is the source language. It can express program steps, including existing class and method forms, or a high-level request in comments.
+- `.en` is the source language. It can express program steps, including existing class and method forms, or a high-level request marked with `#?` in the new language version.
 - A directive in the `.en` file selects the output language. Keep the existing `import codeinpython library` spelling as a Python alias. Define one canonical target syntax before adding another backend.
 - `import codeinenglish` in a Python program loads the package API; Python does not execute comments on import. A Python integration must explicitly call an API such as `codeinenglish.generate_file(...)` or invoke the CLI.
-- `pip install` installs the interpreter and CLI for any user with Python. Producing JavaScript or another target does not require importing a Python module from that target language. Later adapters can call the CLI.
+- `pip install` installs the compiler and CLI for any user with Python. Producing JavaScript or another target does not require importing a Python module from that target language. Later adapters can call the CLI.
 - Offline operation means no model, hosted API, network access, downloaded weights, or third-party runtime dependency during translation.
-- Deterministic recognition can cover a growing set of English requests, but cannot promise correct code for every possible comment. Unsupported or ambiguous requests must fail with a useful explanation.
+- Deterministic recognition can cover a growing set of English requests, but cannot promise correct code for every possible request. Unsupported or ambiguous requests must fail with a useful explanation.
+
+**Review status:** Milestones 2 and 3 are reopened for the source marker/version contract and the shared IR lowering described in [the review follow-up plan](2026-10-21-architecture-review-follow-up.md). The existing implementation remains a verified baseline, not the final architecture.
 
 ## Current starting point
 
@@ -43,7 +46,7 @@ flowchart LR
 
 ## Global constraints
 
-- Keep one maintained interpreter implementation in `EN-Library`; do not copy it into editor extensions or `en-language`.
+- Keep one maintained compiler implementation in `EN-Library`; do not copy it into editor extensions or `en-language`.
 - Preserve existing `.en` examples, `translate`, `translate_file`, `solve`, `solve_file`, `generate_file`, and the corresponding CLI commands unless a separately reviewed migration is required.
 - Preserve source locations and meaningful qualifiers such as negation, output type, case sensitivity, ordering, and missing-result behavior.
 - Generate source without running it. An explicit Run action in an IDE may execute generated code only after successful generation.
@@ -64,7 +67,7 @@ flowchart LR
 
 **Done when:** Neither repository depends on a temporary staging directory, and a clean installation reproduces the documented Greeter and Two Sum workflows offline.
 
-## Milestone 2: Define one `.en` source contract
+## Milestone 2: Define one `.en` source contract (reopened)
 
 **Purpose:** Make a beginner's file format predictable before expanding English coverage or output languages.
 
@@ -75,22 +78,25 @@ flowchart LR
 - [x] Keep one command: `python -m codeinenglish generate FILE.en [--output PATH]`. Document the equivalent `codeinenglish.generate_file(...)` Python API.
 - [x] Add meaningful file-level cases for omitted target, conflicting directives, malformed comments, paths with spaces, and failed generation preserving an existing output.
 - [x] Rewrite the first-run guide around two complete examples: a class-based Greeter and a short comment request for Two Sum. Show generated output and how to run it.
+- [ ] Add a source version header (`en 0.1`), define headerless files as legacy 0.1 during migration, and specify a deprecation policy.
+- [ ] In the next language version, require `#?` to start a problem request; plain `#` comments are documentation.
 
 **Done when:** A new user can identify the file extension, write either accepted form, generate Python, and understand a refusal without learning Python syntax.
 
-## Milestone 3: Make the shared program representation truly target-neutral
+## Milestone 3: Make the shared program representation truly target-neutral (reopened)
 
-**Purpose:** Let both source forms feed typed semantic objects that a second backend can consume. The existing instruction `Program` and problem `ProblemSpec` are the two variants; a new low-level IR for every problem algorithm is deferred until a second backend proves it necessary.
+**Purpose:** Let every source form and problem strategy lower to one typed `Program` IR consumed by every renderer and the reference evaluator. `ProblemSpec` records intent and constraints before strategy lowering, but is never rendered directly.
 
 **Files:** `EN-Library/codeinenglish/ir.py`, `parser.py`, `problem_recognizer.py`, `problem_strategies.py`, `python_generator.py`, and focused tests.
 
-- [x] Inventory current instruction IR nodes and the Python AST produced by problem strategies. The instruction parser already returns `Program`; the problem recognizer already returns `ProblemSpec`.
-- [x] Expose one `interpret_source(source, filename)` entry point that returns either `Program` or `ProblemSpec`, preserving front-end validation and source-located errors.
-- [x] Keep Python rendering behind typed functions for those two variants. Preserve existing `translate`, `solve`, and `generate` behavior.
-- [x] Compare generated Python behavior for every example with the current implementation, including JSON input/output, empty inputs, and embedded examples.
-- [x] Reject a request when its material constraint cannot be represented; never silently discard it.
+- [x] Inventory current instruction IR nodes and Python-AST problem strategies.
+- [ ] Extend the IR with the smallest explicit, target-neutral operations needed by all documented problem strategies.
+- [ ] Lower each recognized `ProblemSpec` plus its strategy to `Program`; retain source constraints and examples as metadata.
+- [ ] Add a reference evaluator and make both Python and JavaScript backends consume only `Program`.
+- [ ] Compare reference, Python, and JavaScript behavior across every supported problem family and boundary cases.
+- [x] Preserve the existing public `translate`, `solve`, and `generate` APIs while the IR migration proceeds.
 
-**Done when:** English recognition returns a typed `Program` or `ProblemSpec` before any Python AST is generated, and the Python backend passes the baseline corpus.
+**Done when:** Both source paths lower to `Program`; no backend consumes `ProblemSpec` or Python AST from problem strategies; reference and generated behavior agree.
 
 ## Milestone 4: Grow English understanding by capability, not by memorized question
 
@@ -101,7 +107,8 @@ flowchart LR
 - [x] Maintain a capability registry listing accepted intent, inputs, output, constraints, defaults, and representative phrasings for each family or language construct.
 - [x] Choose one missing capability at a time from real user requests. Add independent paraphrases, boundary cases, contradictory requests, and generated-behavior checks before marking it supported.
 - [x] Add plain-English diagnostics that state which detail is missing or unsupported; never replace a successful old `.py` with partial new code.
-- [x] Measure coverage with an independently written prompt corpus, including cases that must be rejected. Publish the corpus and actual pass/fail counts with releases.
+- [x] Keep a maintainer-authored regression corpus, including cases that must be rejected. Its scores are self-checks, not independent user coverage.
+- [ ] Collect a separate held-out prompt set from at least three independent testers before making user-understanding or broad coverage claims.
 
 **Done when:** Coverage claims name specific supported capabilities and their measured examples; unfamiliar requests fail honestly.
 
@@ -120,11 +127,11 @@ flowchart LR
 
 ## Milestone 6: Make editor and package access broadly usable
 
-**Purpose:** Let people use the interpreter from their preferred development environment and install a stable release.
+**Purpose:** Let people use the compiler from their preferred development environment and install a stable release.
 
 - [x] Keep the CLI as the editor-independent interface. VS Code uses it through the existing extension; other IDEs can use an external-tool or task configuration first.
 - [x] Add an editor protocol or dedicated extension only when a specific editor needs features that a CLI task cannot provide, such as inline diagnostics.
-- [x] Verify package name, metadata, wheel contents, supported Python versions, and installation instructions in clean environments.
+- [x] Verify metadata, wheel contents, supported Python versions, and installation instructions in clean environments. Public PyPI names were not reserved or release-verified.
 - [x] Prepare separate PyPI and extension Marketplace release checklists. The release artifacts and checklist are prepared; public publication remains a separate action.
 
 **Done when:** A clean install can translate without network access, and each advertised IDE has a demonstrated launch path.
@@ -139,4 +146,4 @@ flowchart LR
 
 ## Execution order
 
-Complete Milestone 1, then Milestone 2. Milestones 3 and 4 can proceed in small reviewed increments; Milestone 5 depends on the shared representation. Milestone 6 can improve installation and editor access as each backend becomes stable. Each milestone receives its own focused implementation plan before code changes.
+Complete Milestone 1, then finish the reopened source contract in Milestone 2 before expanding recognition. Milestone 3 now precedes additional problem strategies or backend expansion; both the second backend and problem strategies depend on the shared IR. Milestone 4 uses a maintainer regression corpus until independent held-out prompts are collected. Milestone 6 can improve installation and editor access as each backend becomes stable. Each milestone receives its own focused implementation plan before code changes.
