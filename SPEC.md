@@ -34,6 +34,8 @@ This is not a claim that fixed offline rules can understand every possible Engli
 
 ## Current capability inventory
 
+`target javascript` selects the first JavaScript backend. It currently accepts instruction programs composed of text, boolean, null, and exact integer literal/name assignments plus `show`; floating-point literals are not yet supported. The problem path supports ascending numeric sort with integers in JavaScript's exact Number range. It writes a sibling `.js` file. The problem runner reads one JSON object from standard input and prints JSON, or checks embedded examples with `--check-examples`. Other instruction nodes and problem families produce an unsupported diagnostic before an output file is changed. The legacy `import codeinpython library` directive remains Python-only.
+
 The instruction translator currently accepts documented forms for variables and values, arithmetic/comparison expressions, input and output, `if`/`otherwise`, `for each` loops over lists, list/dictionary creation and updates, indexing, and classes with methods, instance fields, calls, and returns. It does not claim arbitrary Python syntax or unrestricted English.
 
 The comment-based problem path currently recognizes these deterministic problem families:

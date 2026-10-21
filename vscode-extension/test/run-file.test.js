@@ -87,6 +87,27 @@ test('checks examples in a canonical Python-target problem file', async (t) => {
   assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.py'), '--check-examples']);
 });
 
+test('checks JavaScript examples with Node after Python generation', async (t) => {
+  const env = await fixture({ source: 'target javascript\n# Sort the list of integers in ascending order.\n# Example input: {"nums":[3,1]}\n# Example output: [1,3]\n' });
+  t.after(env.dispose);
+
+  await runFile({ ...env.args, nodePath: '/custom/node' });
+
+  assert.equal(env.tasks[0].execution.process, 'python3');
+  assert.equal(env.tasks[1].execution.process, '/custom/node');
+  assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.js'), '--check-examples']);
+});
+
+test('requires a Node executable for JavaScript target', async (t) => {
+  const env = await fixture({ source: 'target javascript\nshow "Hello"\n' });
+  t.after(env.dispose);
+
+  await runFile({ ...env.args, nodePath: ' ' });
+
+  assert.equal(env.tasks.length, 0);
+  assert.match(env.errors[0], /Node\.js executable/i);
+});
+
 test('runs canonical instructions when their comments mention example input', async (t) => {
   const env = await fixture({ source: 'target python\n# Example input: Ada\nshow "Hello Ada"\n' });
   t.after(env.dispose);

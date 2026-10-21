@@ -2,7 +2,7 @@
   "name": "codeinenglish-runner",
   "displayName": "Code in English Runner",
   "description": "Translate and run Code in English .en files from VS Code.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "anaslari23",
   "engines": {
     "vscode": "^1.80.0"
@@ -46,7 +46,12 @@
         "codeinenglish.pythonPath": {
           "type": "string",
           "default": "python3",
-          "description": "Python executable used to generate and run Code in English files."
+          "description": "Python executable used to generate Code in English files and run Python output."
+        },
+        "codeinenglish.nodePath": {
+          "type": "string",
+          "default": "node",
+          "description": "Node.js executable used to run generated JavaScript files."
         }
       }
     }

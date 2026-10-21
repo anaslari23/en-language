@@ -35,7 +35,7 @@ function executeAndWait(vscode, task) {
   });
 }
 
-async function runFile({ vscode, documentUri, pythonPath }) {
+async function runFile({ vscode, documentUri, pythonPath, nodePath = 'node' }) {
   if (!documentUri || documentUri.scheme && documentUri.scheme !== 'file') {
     vscode.window.showErrorMessage('Open a saved .en file in a workspace before running it.');
     return false;
@@ -56,6 +56,7 @@ async function runFile({ vscode, documentUri, pythonPath }) {
   }
 
   let source;
+  let startingRuntime = 'Python';
   try {
     source = await fs.readFile(sourcePath, 'utf8');
   } catch (error) {
@@ -63,13 +64,18 @@ async function runFile({ vscode, documentUri, pythonPath }) {
     return false;
   }
   const sourceLines = source.split(/\r?\n/).map((line) => line.trim());
-  const isDirective = (line) => line === 'import codeinpython library' || /^target\s+python$/i.test(line);
+  const isJavaScript = sourceLines.some((line) => /^target\s+javascript$/i.test(line));
+  if (isJavaScript && (typeof nodePath !== 'string' || !nodePath.trim())) {
+    vscode.window.showErrorMessage('Set a Node.js executable in the Code in English settings first.');
+    return false;
+  }
+  const isDirective = (line) => line === 'import codeinpython library' || /^target\s+(?:python|javascript)$/i.test(line);
   const hasProblemDirective = sourceLines.some(isDirective);
   const hasInstructions = sourceLines.some((line) => line && !line.startsWith('#') && !isDirective(line));
   const hasExamples = hasProblemDirective && !hasInstructions && /^\s*#\s*Example input\s*:/im.test(source);
   const generatedPath = path.join(
     path.dirname(sourcePath),
-    `${path.basename(sourcePath, path.extname(sourcePath))}.py`,
+    `${path.basename(sourcePath, path.extname(sourcePath))}.${isJavaScript ? 'js' : 'py'}`,
   );
 
   try {
@@ -82,7 +88,7 @@ async function runFile({ vscode, documentUri, pythonPath }) {
     );
     const generationExit = await executeAndWait(vscode, generateTask);
     if (generationExit !== 0) {
-      vscode.window.showErrorMessage(`Could not generate Python (exit code ${generationExit ?? 'unknown'}). See the Code in English terminal.`);
+      vscode.window.showErrorMessage(`Could not generate code (exit code ${generationExit ?? 'unknown'}). See the Code in English terminal.`);
       return false;
     }
 
@@ -92,10 +98,11 @@ async function runFile({ vscode, documentUri, pythonPath }) {
     const runTask = createTask(
       vscode,
       workspaceFolder,
-      pythonPath,
+      isJavaScript ? nodePath : pythonPath,
       runArgs,
       hasExamples ? `check ${path.basename(sourcePath)}` : `run ${path.basename(sourcePath)}`,
     );
+    startingRuntime = isJavaScript ? 'Node.js' : 'Python';
 
     if (!hasExamples) {
       await vscode.tasks.executeTask(runTask);
@@ -111,10 +118,12 @@ async function runFile({ vscode, documentUri, pythonPath }) {
     return true;
   } catch (error) {
     if (error.code === 'ENOENT') {
-      vscode.window.showErrorMessage(`Python executable '${pythonPath}' was not found. Update codeinenglish.pythonPath in settings.`);
+      const executable = startingRuntime === 'Node.js' ? nodePath : pythonPath;
+      const setting = startingRuntime === 'Node.js' ? 'nodePath' : 'pythonPath';
+      vscode.window.showErrorMessage(`${startingRuntime} executable '${executable}' was not found. Update codeinenglish.${setting} in settings.`);
       return false;
     }
-    vscode.window.showErrorMessage(`Could not start Python: ${error.message}`);
+    vscode.window.showErrorMessage(`Could not start Code in English: ${error.message}`);
     return false;
   }
 }

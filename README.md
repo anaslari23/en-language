@@ -1,6 +1,6 @@
 # Code in English
 
-Code in English lets you write supported instructions or DSA problem statements in `.en` files and generate ordinary Python for review. The language project and Python translator are separate repositories:
+Code in English lets you write supported instructions or DSA problem statements in `.en` files and generate ordinary Python or JavaScript for review. The language project and interpreter are separate repositories:
 
 - [en-language](https://github.com/anaslari23/en-language) contains the language spec, examples, and VS Code extension.
 - [EN-Library](https://github.com/anaslari23/EN-Library) contains the `codeinenglish` Python package and its tests.
@@ -55,6 +55,18 @@ python3 -m codeinenglish generate examples/greeter.en
 Inside Python, `import codeinenglish` exposes the package API. To generate from a file, call `codeinenglish.generate_file("program.en")`; importing alone does not act on Python comments.
 
 See [SPEC.md](SPEC.md) for the language contract, supported forms, problem families, and limitations.
+
+## Generate JavaScript for the shared subset
+
+JavaScript output currently supports simple assignments and `show` instructions, plus ascending numeric sort problem requests. For example, `examples/sort_numbers_javascript.en` uses `target javascript` and includes a checked example:
+
+```sh
+python3 -m codeinenglish generate examples/sort_numbers_javascript.en
+node examples/sort_numbers_javascript.js --check-examples
+echo '{"nums":[3,1,3,-2]}' | node examples/sort_numbers_javascript.js
+```
+
+The same `.en` comment request with `target python` generates the corresponding Python behavior. Unsupported JavaScript constructs fail clearly before overwriting output. Node.js is needed to run generated JavaScript, but not to generate it.
 
 ## VS Code Run button
 

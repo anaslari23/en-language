@@ -111,10 +111,10 @@ flowchart LR
 
 **First target:** JavaScript, after Milestone 3. Give it a separate implementation plan and release gate.
 
-- [ ] Define JavaScript output filenames, runtime input/output behavior, and mapping for every supported shared IR node.
-- [ ] Add a JavaScript backend in EN-Library and a target directive alias in `.en`; avoid a second English parser.
-- [ ] Run shared examples against both backends and compare observable results. Reject constructs that have no defined JavaScript meaning.
-- [ ] Document how a JavaScript project invokes the CLI; consider an npm wrapper only if users need a native JavaScript integration.
+- [x] Define JavaScript output filenames, runtime input/output behavior, and mapping for the documented shared subset of IR nodes.
+- [x] Add a JavaScript backend in EN-Library and a `target javascript` directive in `.en`; avoid a second English parser.
+- [x] Run shared examples against both backends and compare observable results. Reject constructs that have no defined JavaScript meaning.
+- [x] Document how a JavaScript project invokes the CLI; consider an npm wrapper only if users need a native JavaScript integration.
 
 **Done when:** The same supported `.en` request produces equivalent Python and JavaScript behavior for the documented shared subset.
 

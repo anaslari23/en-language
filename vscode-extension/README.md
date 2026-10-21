@@ -1,6 +1,6 @@
 # Code in English Runner for VS Code
 
-This extension adds a **▶ Run** CodeLens to `.en` files. It calls the separately installed `codeinenglish` Python package to generate a sibling `.py` file, then checks embedded examples or starts the generated program in the integrated terminal.
+This extension adds a **▶ Run** CodeLens to `.en` files. It calls the separately installed `codeinenglish` Python package to generate a sibling `.py` or `.js` file, then checks embedded examples or starts the generated program in the integrated terminal.
 
 The extension calls one `codeinenglish generate` command. A standalone `target python` directive selects Python output: comment-only files request a problem solution, while files with English instructions run as programs. The older `import codeinpython library` problem directive also works.
 
@@ -9,6 +9,7 @@ The extension calls one `codeinenglish generate` command. A standalone `target p
 - VS Code 1.80 or newer.
 - Python 3.10 or newer.
 - The `codeinenglish` package installed in the same Python interpreter configured by `codeinenglish.pythonPath`.
+- Node.js for files declaring `target javascript`.
 
 ## Install the Python package
 
@@ -48,8 +49,9 @@ Open a saved `.en` file in a workspace and click **▶ Run** above the prompt.
 - With `target python` and a comment-only problem request, the extension generates a solution. If there are `Example input:` / `Example output:` comments, it runs `--check-examples`.
 - With a problem request and no examples, it starts the generated solution in the integrated terminal. Enter one JSON object matching the generated function's arguments, then press Return.
 - With English instruction lines, it translates and starts the resulting Python. Comments in such a file are documentation.
+- With `target javascript`, it generates a `.js` file and uses the configured `codeinenglish.nodePath` (default `node`) to run it. JavaScript currently supports literal/name assignments, `show`, and ascending numeric sort problems.
 
-The generated `.py` file is saved beside the `.en` source. The extension does not edit the source. It does not start generated Python unless generation succeeds.
+The generated `.py` or `.js` file is saved beside the `.en` source. The extension does not edit the source. It does not start generated code unless generation succeeds.
 
 ## Troubleshooting
 

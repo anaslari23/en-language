@@ -22,7 +22,10 @@ function createRunCommand(vscode, run = runFile) {
     const pythonPath = vscode.workspace
       .getConfiguration('codeinenglish')
       .get('pythonPath', 'python3');
-    return run({ vscode, documentUri, pythonPath });
+    const nodePath = vscode.workspace
+      .getConfiguration('codeinenglish')
+      .get('nodePath', 'node');
+    return run({ vscode, documentUri, pythonPath, nodePath });
   };
 }
 
