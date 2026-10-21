@@ -5,15 +5,45 @@ const os = require('node:os');
 const path = require('node:path');
 const { runFile } = require('../src/run-file');
 
-async function fixture({ source, exitCodes = [0, 0], workspace = true, pythonPath = 'python3', executeError } = {}) {
+async function fixture({
+  source = 'en 0.2\ntarget python\n#? generated intent\n',
+  payload,
+  generationError,
+  dirty = false,
+  saveResult = true,
+  workspace = true,
+  pythonPath = 'python3',
+  nodePath = 'node',
+  exitCodes = [0],
+  executeError,
+} = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'codeinenglish run '));
   const sourcePath = path.join(directory, 'my problem.en');
-  await fs.writeFile(sourcePath, source ?? 'import codeinpython library\n# Find two numbers that add up to target and return indices.\n', 'utf8');
+  await fs.writeFile(sourcePath, source, 'utf8');
+  const outputPath = path.join(directory, 'generated.py');
+  const response = payload ?? {
+    schema_version: 1,
+    file: sourcePath,
+    version: '0.2',
+    supported_versions: ['0.1', '0.2'],
+    target: 'python',
+    form: 'problem',
+    examples: { present: false, count: 0 },
+    plan: { output_path: outputPath, runtime: 'python', run_examples: false, run_args: [outputPath] },
+    written: true,
+    diagnostics: [],
+  };
   const folder = { uri: { fsPath: directory }, name: 'workspace' };
+  const events = [];
   const tasks = [];
   const errors = [];
   const information = [];
-  const listeners = [];
+  const calls = [];
+  let subscription;
+  const document = {
+    isDirty: dirty,
+    async save() { events.push('save'); return saveResult; },
+  };
   class ProcessExecution {
     constructor(process, args, options) { Object.assign(this, { process, args, options }); }
   }
@@ -25,29 +55,15 @@ async function fixture({ source, exitCodes = [0, 0], workspace = true, pythonPat
   const vscode = {
     ProcessExecution,
     Task,
-    TaskScope: { Workspace: 1 },
     TaskRevealKind: { Always: 'always' },
     TaskPanelKind: { Shared: 'shared' },
-    workspace: {
-      getWorkspaceFolder: () => workspace ? folder : undefined,
-    },
+    workspace: { getWorkspaceFolder: () => workspace ? folder : undefined },
     tasks: {
-      onDidEndTaskProcess(callback) {
-        listeners.push(callback);
-        return { dispose() {} };
-      },
+      onDidEndTaskProcess(callback) { subscription = callback; return { dispose() {} }; },
       async executeTask(task) {
         if (executeError) throw executeError;
-        if (task.definition.type !== 'codeinenglish' || task.scope !== folder) {
-          throw new Error('Task is not valid');
-        }
         tasks.push(task);
-        const exitCode = exitCodes.shift();
-        if (exitCode !== undefined) {
-          queueMicrotask(() => {
-            for (const listener of listeners) listener({ execution: { task }, exitCode });
-          });
-        }
+        queueMicrotask(() => subscription?.({ execution: { task }, exitCode: exitCodes.shift() }));
         return { task };
       },
     },
@@ -56,151 +72,140 @@ async function fixture({ source, exitCodes = [0, 0], workspace = true, pythonPat
       showInformationMessage(message) { information.push(message); },
     },
   };
+  const execFile = (executable, args, options, callback) => {
+    events.push('generate');
+    calls.push({ executable, args, options });
+    if (generationError) return callback(generationError, JSON.stringify(payload ?? {}), 'generation failed');
+    callback(null, JSON.stringify(response), '');
+  };
   return {
-    vscode, directory, sourcePath, folder, tasks, errors, information,
+    vscode, directory, sourcePath, outputPath, folder, tasks, errors, information,
+    events, calls, document,
     dispose: () => fs.rm(directory, { recursive: true, force: true }),
-    args: { vscode, documentUri: { fsPath: sourcePath }, pythonPath },
+    args: { vscode, documentUri: { fsPath: sourcePath, scheme: 'file' }, document, pythonPath, nodePath, execFile },
   };
 }
 
-test('runs unified generation then embedded example check with workspace cwd', async (t) => {
-  const env = await fixture({ source: 'import codeinpython library\n# Example input: {"nums":[2,7],"target":9}\n# Example output: [0,1]\n' });
+test('asks the CLI for JSON, then executes only its returned plan', async (t) => {
+  const env = await fixture({ payload: {
+    schema_version: 1, file: 'misleading.en', version: '0.2', supported_versions: ['0.1', '0.2'],
+    target: 'python', form: 'instructions', examples: { present: false, count: 0 },
+    plan: { output_path: '/tmp/generated file.py', runtime: 'python', run_examples: false,
+      run_args: ['/tmp/generated file.py', '--custom-flag'] }, written: true, diagnostics: [],
+  }, source: 'target javascript\n# Example input: misleading\n' });
   t.after(env.dispose);
 
-  await runFile(env.args);
+  const result = await runFile(env.args);
 
-  assert.equal(env.tasks.length, 2);
-  assert.deepEqual(env.tasks[0].execution.args, ['-m', 'codeinenglish', 'generate', env.sourcePath]);
-  assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.py'), '--check-examples']);
-  assert.equal(env.tasks[0].execution.options.cwd, env.directory);
-  assert.equal(env.tasks[0].presentationOptions.focus, true);
-  assert.equal(env.tasks[0].presentationOptions.reveal, 'always');
+  assert.equal(result, true);
+  assert.deepEqual(env.calls[0].args, ['-m', 'codeinenglish', 'generate', env.sourcePath, '--json']);
+  assert.equal(env.calls[0].executable, 'python3');
+  assert.deepEqual(env.tasks[0].execution.args, ['/tmp/generated file.py', '--custom-flag']);
+  assert.equal(env.tasks[0].execution.process, 'python3');
+  assert.deepEqual(env.events, ['generate']);
+});
+
+test('uses the exact example-checker arguments supplied by the run plan', async (t) => {
+  const env = await fixture({ payload: {
+    schema_version: 1, file: 'x.en', version: '0.2', supported_versions: ['0.1', '0.2'],
+    target: 'javascript', form: 'problem', examples: { present: true, count: 2 },
+    plan: { output_path: '/tmp/out.js', runtime: 'node', run_examples: true,
+      run_args: ['/tmp/out.js', '--check-examples', '--format=json'] }, written: true, diagnostics: [],
+  }, nodePath: '/custom node' });
+  t.after(env.dispose);
+  await runFile(env.args);
+  assert.equal(env.tasks[0].execution.process, '/custom node');
+  assert.deepEqual(env.tasks[0].execution.args, ['/tmp/out.js', '--check-examples', '--format=json']);
   assert.equal(env.information.length, 1);
 });
 
-test('checks examples in a canonical Python-target problem file', async (t) => {
-  const env = await fixture({ source: 'target python\n# Find two numbers that add to target and return indices.\n# Example input: {"nums":[2,7],"target":9}\n# Example output: [0,1]\n' });
+test('saves a dirty editor document before invoking the CLI', async (t) => {
+  const env = await fixture({ dirty: true });
   t.after(env.dispose);
-
   await runFile(env.args);
-
-  assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.py'), '--check-examples']);
+  assert.deepEqual(env.events, ['save', 'generate']);
 });
 
-test('checks JavaScript examples with Node after Python generation', async (t) => {
-  const env = await fixture({ source: 'target javascript\n# Sort the list of integers in ascending order.\n# Example input: {"nums":[3,1]}\n# Example output: [1,3]\n' });
+test('does not generate when saving the dirty document fails', async (t) => {
+  const env = await fixture({ dirty: true, saveResult: false });
   t.after(env.dispose);
-
-  await runFile({ ...env.args, nodePath: '/custom/node' });
-
-  assert.equal(env.tasks[0].execution.process, 'python3');
-  assert.equal(env.tasks[1].execution.process, '/custom/node');
-  assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.js'), '--check-examples']);
+  await runFile(env.args);
+  assert.equal(env.calls.length, 0);
+  assert.equal(env.tasks.length, 0);
+  assert.match(env.errors[0], /save/i);
 });
 
-test('requires a Node executable for JavaScript target', async (t) => {
-  const env = await fixture({ source: 'target javascript\nshow "Hello"\n' });
+test('reports CLI diagnostics at their returned source positions and never runs stale output', async (t) => {
+  const diagnostic = { code: 'EN-E302', severity: 'error', file: '/tmp/bad.en', line: 8, column: 4,
+    end_line: 8, end_column: 5, message: 'A file cannot mix requests and instructions.', hint: null, related: [] };
+  const env = await fixture({ payload: {
+    schema_version: 1, file: 'bad.en', version: '0.2', supported_versions: ['0.1', '0.2'],
+    target: 'python', form: null, examples: { present: false, count: 0 }, plan: null,
+    written: false, diagnostics: [diagnostic],
+  } });
   t.after(env.dispose);
+  const result = await runFile(env.args);
+  assert.equal(result, false);
+  assert.equal(env.tasks.length, 0);
+  assert.match(env.errors[0], /bad\.en:8:4/);
+});
 
-  await runFile({ ...env.args, nodePath: ' ' });
+test('refuses unknown JSON schema versions', async (t) => {
+  const env = await fixture({ payload: { schema_version: 99, written: true, plan: {} } });
+  t.after(env.dispose);
+  await runFile(env.args);
+  assert.equal(env.tasks.length, 0);
+  assert.match(env.errors[0], /update/i);
+});
 
+test('refuses to run unless generation reports written true', async (t) => {
+  const env = await fixture();
+  t.after(env.dispose);
+  env.args.execFile = (executable, args, options, callback) => callback(null, JSON.stringify({
+    schema_version: 1, file: env.sourcePath, version: '0.2', supported_versions: ['0.1', '0.2'],
+    target: 'python', form: 'instructions', examples: { present: false, count: 0 },
+    plan: { output_path: env.outputPath, runtime: 'python', run_examples: false, run_args: [env.outputPath] },
+    written: false, diagnostics: [],
+  }), '');
+  await runFile(env.args);
+  assert.equal(env.tasks.length, 0);
+  assert.match(env.errors[0], /did not write/i);
+});
+
+test('reports generation diagnostics from the CLI response', async (t) => {
+  const env = await fixture({ generationError: Object.assign(new Error('exit 1'), { code: 1 }) });
+  t.after(env.dispose);
+  await runFile(env.args);
+  assert.equal(env.tasks.length, 0);
+  assert.match(env.errors[0], /could not generate/i);
+});
+
+test('keeps executable and paths with spaces as separate arguments', async (t) => {
+  const env = await fixture({ pythonPath: '/custom Python/python' });
+  t.after(env.dispose);
+  await runFile(env.args);
+  assert.equal(env.calls[0].executable, '/custom Python/python');
+  assert.equal(env.calls[0].options.cwd, env.directory);
+  assert.deepEqual(env.tasks[0].execution.args, [env.outputPath]);
+});
+
+test('requires Node when the CLI plan chooses JavaScript', async (t) => {
+  const env = await fixture({ nodePath: ' ', payload: {
+    schema_version: 1, file: 'x.en', version: '0.2', supported_versions: ['0.1', '0.2'],
+    target: 'javascript', form: 'instructions', examples: { present: false, count: 0 },
+    plan: { output_path: '/tmp/a.js', runtime: 'node', run_examples: false, run_args: ['/tmp/a.js'] },
+    written: true, diagnostics: [],
+  } });
+  t.after(env.dispose);
+  await runFile(env.args);
   assert.equal(env.tasks.length, 0);
   assert.match(env.errors[0], /Node\.js executable/i);
 });
 
-test('runs canonical instructions when their comments mention example input', async (t) => {
-  const env = await fixture({ source: 'target python\n# Example input: Ada\nshow "Hello Ada"\n' });
-  t.after(env.dispose);
-
-  await runFile(env.args);
-
-  assert.deepEqual(env.tasks[1].execution.args, [env.sourcePath.replace(/\.en$/, '.py')]);
-});
-
-test('starts generated problem code without flags when no examples are present', async (t) => {
-  const env = await fixture();
-  t.after(env.dispose);
-
-  await runFile(env.args);
-
-  assert.deepEqual(env.tasks.map((task) => task.execution.args), [
-    ['-m', 'codeinenglish', 'generate', env.sourcePath],
-    [env.sourcePath.replace(/\.en$/, '.py')],
-  ]);
-});
-
-test('generates regular Code in English programs before running them', async (t) => {
-  const env = await fixture({ source: 'show "Hello Ada"\n' });
-  t.after(env.dispose);
-
-  await runFile(env.args);
-
-  assert.deepEqual(env.tasks.map((task) => task.execution.args), [
-    ['-m', 'codeinenglish', 'generate', env.sourcePath],
-    [env.sourcePath.replace(/\.en$/, '.py')],
-  ]);
-});
-
-test('preserves paths with spaces and configured Python path as separate process arguments', async (t) => {
-  const env = await fixture({ source: 'import codeinpython library\n# Example input: {}\n# Example output: null\n', pythonPath: '/custom python/python' });
-  t.after(env.dispose);
-
-  await runFile(env.args);
-
-  assert.equal(env.tasks[0].execution.process, '/custom python/python');
-  assert.deepEqual(env.tasks[0].execution.args, ['-m', 'codeinenglish', 'generate', env.sourcePath]);
-  assert.equal(env.tasks[0].execution.options.cwd, env.directory);
-  assert.equal(env.tasks[1].execution.args[0], env.sourcePath.replace(/\.en$/, '.py'));
-});
-
-test('does not execute stale output when generation fails', async (t) => {
-  const env = await fixture({ exitCodes: [1] });
-  t.after(env.dispose);
-
-  await runFile(env.args);
-
-  assert.equal(env.tasks.length, 1);
-  assert.match(env.errors[0], /could not generate/i);
-});
-
-test('reports a failing embedded example check', async (t) => {
-  const env = await fixture({ source: 'import codeinpython library\n# Example input: {}\n# Example output: null\n', exitCodes: [0, 1] });
-  t.after(env.dispose);
-
-  await runFile(env.args);
-
-  assert.equal(env.tasks.length, 2);
-  assert.match(env.errors[0], /example check failed/i);
-  assert.equal(env.information.length, 0);
-});
-
-test('reports missing workspace without starting a task', async (t) => {
+test('reports missing workspace without invoking the CLI', async (t) => {
   const env = await fixture({ workspace: false });
   t.after(env.dispose);
-
   await runFile(env.args);
-
-  assert.equal(env.tasks.length, 0);
-  assert.match(env.errors[0], /open a workspace/i);
-});
-
-test('reports an empty Python executable without starting a task', async (t) => {
-  const env = await fixture({ pythonPath: '  ' });
-  t.after(env.dispose);
-
-  await runFile({ ...env.args, pythonPath: '  ' });
-
-  assert.equal(env.tasks.length, 0);
-  assert.match(env.errors[0], /python executable/i);
-});
-
-test('reports a missing configured Python executable clearly', async (t) => {
-  const missingPython = Object.assign(new Error('spawn python3 ENOENT'), { code: 'ENOENT' });
-  const env = await fixture({ executeError: missingPython });
-  t.after(env.dispose);
-
-  await runFile(env.args);
-
-  assert.equal(env.tasks.length, 0);
-  assert.match(env.errors[0], /python executable .*not found/i);
+  assert.equal(env.calls.length, 0);
+  assert.match(env.errors[0], /workspace/i);
 });

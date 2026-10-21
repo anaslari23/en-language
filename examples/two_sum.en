@@ -1,4 +1,5 @@
 # Find two values that add up to the target and display their indices.
+en 0.2
 make an empty list called nums
 add 2 to nums
 add 7 to nums

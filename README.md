@@ -19,14 +19,15 @@ To install from a local EN-Library checkout instead, run `python3 -m pip install
 
 ## Generate Python from a problem statement
 
-Create a `.en` file with the target directive and a problem statement in comments:
+Create a versioned `.en` file. In `en 0.2`, a problem request is a contiguous block of `#?` lines; ordinary `#` lines remain documentation:
 
 ```text
+en 0.2
 target python
-# Find two numbers that add up to the target.
-# Return their indices. Exactly one solution exists.
-# Example input: {"nums":[2,7,11,15],"target":9}
-# Example output: [0,1]
+#? Find two numbers that add up to the target.
+#? Return their indices. Exactly one solution exists.
+#? Example input: {"nums":[2,7,11,15],"target":9}
+#? Example output: [0,1]
 ```
 
 Generate an editable sibling `.py` file:
@@ -50,7 +51,7 @@ Use the same command for an instruction-style program such as `examples/greeter.
 python3 -m codeinenglish generate examples/greeter.en
 ```
 
-`target python` selects Python output. When the remaining file contains only `#` comments, those comments form the problem request. When it contains English instructions, comments are documentation. Existing `import codeinpython library` problem files still work. Files without a directive still translate English instructions. The lower-level `translate` and `solve` commands remain available. Generation writes Python but does not execute it; the VS Code **Run** button separately starts generated Python after successful generation.
+`target python` selects Python output; omitting the target defaults to Python. In `en 0.2`, only `#?` lines form a problem request and ordinary comments are ignored. Headerless and `en 0.1` files keep legacy behavior and receive a deprecation warning. The legacy `import codeinpython library` alias is accepted only in those legacy forms. Use `python3 -m codeinenglish check FILE.en --json` to inspect the contract without writing, or `python3 -m codeinenglish migrate FILE.en` to preview a safe migration (`--write` applies it after checking generated-code equivalence). The lower-level `translate` and `solve` commands remain available. Generation writes code but does not execute it; the VS Code **Run** button runs generated code only after successful generation.
 
 Inside Python, `import codeinenglish` exposes the package API. To generate from a file, call `codeinenglish.generate_file("program.en")`; importing alone does not act on Python comments.
 
@@ -66,7 +67,7 @@ node examples/sort_numbers_javascript.js --check-examples
 echo '{"nums":[3,1,3,-2]}' | node examples/sort_numbers_javascript.js
 ```
 
-The same `.en` comment request with `target python` generates the corresponding Python behavior. Unsupported JavaScript constructs fail clearly before overwriting output. Node.js is needed to run generated JavaScript, but not to generate it.
+The same `en 0.2` `#?` request with `target python` generates the corresponding Python behavior. Unsupported JavaScript constructs fail clearly before overwriting output. Node.js is needed to run generated JavaScript, but not to generate it.
 
 ## VS Code Run button
 
@@ -79,7 +80,7 @@ npm test
 npm run package
 ```
 
-In VS Code, choose **Install from VSIX...** from the Extensions view and select the generated `.vsix`. Set `codeinenglish.pythonPath` to the exact interpreter where you installed EN-Library. The extension adds **▶ Run** to `.en` files and calls the unified `generate` command; the directive selects problem solving, and other supported `.en` programs use the instruction translator. See the [extension guide](vscode-extension/README.md).
+In VS Code, choose **Install from VSIX...** from the Extensions view and select the generated `.vsix`. Set `codeinenglish.pythonPath` to the exact interpreter where you installed EN-Library. The extension adds **▶ Run** to `.en` files, saves the current document, calls `generate --json`, and runs only the exact plan returned by the CLI. The extension does not parse source directives itself. See the [extension guide](vscode-extension/README.md).
 
 ## Other editors
 

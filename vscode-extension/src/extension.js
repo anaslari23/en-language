@@ -25,7 +25,16 @@ function createRunCommand(vscode, run = runFile) {
     const nodePath = vscode.workspace
       .getConfiguration('codeinenglish')
       .get('nodePath', 'node');
-    return run({ vscode, documentUri, pythonPath, nodePath });
+    const activeDocument = vscode.window?.activeTextEditor?.document;
+    const sameDocument = (left, right) => Boolean(left && right &&
+      (left.toString?.() !== '[object Object]' && left.toString?.() === right.toString?.()
+        || left.fsPath && left.fsPath === right.fsPath));
+    const openDocument = vscode.workspace.textDocuments?.find((document) =>
+      sameDocument(document.uri, documentUri));
+    const document = sameDocument(activeDocument?.uri, documentUri)
+      ? activeDocument
+      : openDocument;
+    return run({ vscode, documentUri, document, pythonPath, nodePath });
   };
 }
 

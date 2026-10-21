@@ -9,14 +9,14 @@ Let a user describe a program in supported, ordinary English in a `.en` file and
 - Input is a `.en` file containing a program request expressed in documented English patterns.
 - Output is Python source in a `.py` file, next to the input by default; users can choose another output path.
 - The Python API exposes `translate(source: str) -> str`, `translate_file(source_path, output_path=None) -> Path`, and the unified `generate_file(source_path, output_path=None) -> Path`.
-- The CLI exposes `codeinenglish generate SOURCE [--output PATH]` as the normal entry point, plus explicit `translate` and `solve` commands.
+- The CLI exposes `codeinenglish generate SOURCE [--output PATH]` as the normal entry point, `check SOURCE --json`, `generate SOURCE --json`, and `migrate SOURCE [--to VERSION] [--write]`, plus explicit `translate` and `solve` commands.
 - Translation never executes generated Python.
 - The source `.en` file is not modified. Failed or invalid translation must not replace an existing `.py` output.
 - No model, network access, package dependency, or model download is required. Use the Python standard library at runtime.
 
 ## Comment-based problem generation
 
-The current 0.1 source contract uses `target python` to select a problem request; `import codeinpython library` remains a legacy problem-file alias. Headerless files retain their existing 0.1 interpretation during migration. The next source version is planned to use an explicit `en 0.2` header and require `#?` to mark a problem request; ordinary `#` comments will be documentation. This versioned marker contract is planned and is not implemented in the current release. Unknown source versions will be rejected, and any future removal of legacy syntax must follow a documented deprecation period. Only Python output is currently supported for the full source contract.
+The source contract is implemented in EN-Library 0.2.0. Headerless files and `en 0.1` use the legacy interpretation; `en 0.2` requires an explicit `#?` request block and treats ordinary `#` comments as documentation. `target python` or `target javascript` is a standalone directive. The old `import codeinpython library` alias remains available in legacy and `en 0.1`, and is an error in `en 0.2`. Supported versions are an explicit set, so unsupported versions are diagnosed instead of guessed.
 
 `solve(source)` returns Python source and `solve_file(path, output_path=None)` writes a sibling `.py` by default. `generate_file` and `python3 -m codeinenglish generate SOURCE [--output PATH]` select the appropriate path from the source contract. Directives are not included in generated Python. A Python `import codeinenglish` exposes the package API; it does not execute Python comments. This problem path is a curated deterministic recognizer and strategy library, not an unrestricted English translator.
 
@@ -34,7 +34,9 @@ This is not a claim that fixed offline rules can understand every possible Engli
 
 ## Source version migration
 
-The current released syntax is treated as source version 0.1. Existing files without a version header keep their current behavior, including the explicit `target python` and legacy `import codeinpython library` problem directives. Do not reinterpret those files as the language evolves. The planned 0.2 syntax will use an `en 0.2` header; only a `#?` comment block will request problem generation, while `#` remains documentation. The compiler will reject unknown version headers. The project will announce deprecations in release notes and documentation, retain a deprecated form for at least one minor release cycle, and provide a migration note before removal. These 0.2 rules are design commitments, not current behavior.
+The current explicit language versions are `en 0.1` and `en 0.2`; headerless sources remain supported in legacy mode and receive EN-W401. Version headers may follow blank lines and ordinary comments, but must precede requests and instructions. `en 0.1` preserves the old comment and target behavior. In `en 0.2`, a problem must use one contiguous `#?` block, ordinary comments are documentation, and lowercase target directives are accepted. A second request block, mixed problem/instruction source, duplicate target, malformed header, or unknown version stops generation before an output file is changed. Legacy mode is scheduled for removal in package version 0.4.0, after warnings in 0.2.x and 0.3.x.
+
+Use `python -m codeinenglish check FILE.en --json` to inspect the parsed contract and run plan without writing output. The VS Code extension saves the open document, calls `generate --json`, and executes the exact run plan returned by the CLI. Use `python -m codeinenglish generate FILE.en --json` to generate and return the same JSON response with `written: true` only after a successful atomic write. `python -m codeinenglish migrate FILE.en` prints a dry-run diff; add `--write` to apply it. Migration compares generated code bodies and leaves the source untouched when they differ. Headerless sources warn for two package minor releases after the first warning release; with EN-Library 0.2.0 as the first warning release, the planned removal point is 0.4.0. Warnings go to stderr or the structured diagnostics and do not change generated code bytes.
 
 The PyPI distribution name and Python import name are separate: the intended distribution candidate is `codeinenglish`, and the module remains `codeinenglish`. A read-only PyPI lookup on 2026-10-21 found no published project records for either `en` or `codeinenglish`; this does not reserve either name or guarantee PyPI will accept it at release time. Recheck availability and policy before publishing. Avoid the generic `en` distribution name.
 
@@ -63,7 +65,7 @@ The comment-based problem path currently recognizes these deterministic problem 
 | Balanced delimiters | text | whether brackets and parentheses are balanced |
 | Ascending sort | integer list | a new list ordered from smallest to largest, preserving duplicates |
 
-Each listed family has maintainer-authored regression examples and accepted wording in EN-Library. The capability registry is `ProblemFamily` with its input and assumption mappings in `problem_recognizer.py`; `tests/fixtures/prompt_corpus.json` records representative accepted and rejected phrasings. For version 0.1.4, all 24 accepted corpus prompts map to their intended family and all 8 ambiguous or unsupported prompts are rejected. These are internal regression results, not independent evidence of user coverage. Before making broad understanding claims, collect a separate held-out prompt set from at least three independent testers and report its results separately. New phrasing and problem families need explicit rules and tests; unsupported or ambiguous wording produces a diagnostic.
+Each listed family has maintainer-authored regression examples and accepted wording in EN-Library. The capability registry is `ProblemFamily` with its input and assumption mappings in `problem_recognizer.py`; `tests/fixtures/prompt_corpus.json` records representative accepted and rejected phrasings. In the EN-Library 0.2.0 regression corpus, all 24 accepted prompts map to their intended family and all 8 ambiguous or unsupported prompts are rejected. These are internal regression results, not independent evidence of user coverage. Before making broad understanding claims, collect a separate held-out prompt set from at least three independent testers and report its results separately. New phrasing and problem families need explicit rules and tests; unsupported or ambiguous wording produces a diagnostic.
 
 ## Compiler architecture
 
@@ -71,7 +73,7 @@ Each listed family has maintainer-authored regression examples and accepted word
 2. Parse English statements into a typed `Program`; recognize a marked request into `ProblemSpec`, then lower its selected strategy into the same `Program` IR. `ProblemSpec` preserves intent and constraints before lowering and is never consumed directly by a backend.
 3. Resolve names and report unknown or ambiguous references with the `.en` line number.
 4. Render Python from `Program` and validate it with Python's built-in `ast` module before returning or writing it. Future backends and the reference evaluator will also consume `Program` only.
-5. Write output atomically and include compiler/source-version metadata plus a source-line map so generated-code diagnostics can point back to the `.en` file. Source mapping and the shared problem IR are planned architecture work; the current implementation does not yet provide them.
+5. Write output atomically and include deterministic compiler/source-version metadata. Source-line maps and a shared problem IR remain planned architecture work; the current implementation reports source positions for translation diagnostics but does not yet map runtime Python tracebacks back to `.en` lines.
 
 Keep the grammar, IR, and Python generation small and explicit. Add phrase variations as aliases for existing meanings instead of duplicating translation logic.
 

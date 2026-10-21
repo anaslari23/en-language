@@ -2,7 +2,7 @@
   "name": "codeinenglish-runner",
   "displayName": "Code in English Runner",
   "description": "Translate and run Code in English .en files from VS Code.",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "publisher": "anaslari23",
   "engines": {
     "vscode": "^1.80.0"

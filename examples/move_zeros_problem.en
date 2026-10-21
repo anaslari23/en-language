@@ -1,4 +1,5 @@
-import codeinpython library
-# Move every zero to the end of the list while preserving the order of other values.
-# Example input: {"nums":[0,2,0,1,3]}
-# Example output: [2,1,3,0,0]
+en 0.2
+target python
+#? Move every zero to the end of the list while preserving the order of other values.
+#? Example input: {"nums":[0,2,0,1,3]}
+#? Example output: [2,1,3,0,0]

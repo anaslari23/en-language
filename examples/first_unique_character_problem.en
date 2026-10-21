@@ -1,4 +1,5 @@
-import codeinpython library
-# Return the first non-repeating character in the text.
-# Example input: {"text":"swiss"}
-# Example output: "w"
+en 0.2
+target python
+#? Return the first non-repeating character in the text.
+#? Example input: {"text":"swiss"}
+#? Example output: "w"
